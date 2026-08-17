@@ -400,8 +400,12 @@ Ese comando la deja sincronizada en `pubspec.yaml`, en la aplicación
 
 ## Actualizaciones automáticas
 
-Traducy consulta las releases de este repositorio al arrancar. Cuando hay una
-versión nueva:
+Traducy consulta las releases de este repositorio **ocho segundos después de
+arrancar** y luego **cada seis horas**: una partida larga se entera igual que
+quien acaba de abrir el programa. La primera va con retraso a propósito, para no
+competir con el resto del arranque por la red.
+
+Cuando hay una versión nueva:
 
 1. **Detiene la traducción y bloquea la aplicación.** Es a propósito: una versión
    vieja funcionando a medias da resultados raros que parecen fallos de la propia

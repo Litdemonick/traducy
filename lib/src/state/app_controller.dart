@@ -179,6 +179,7 @@ class AppController extends ChangeNotifier {
       // que la interfaz ya esté en pantalla para que el arranque sea inmediato.
       unawaited(refreshEngineHealth().then((_) => autoDetectSetup()));
       unawaited(refreshWindowList());
+      _startUpdateWatch();
     } catch (e, st) {
       log.e('controller', 'Fallo al inicializar', e, st);
       _fatalError = t.panel.msgStartFailed('$e');
@@ -1510,6 +1511,41 @@ class AppController extends ChangeNotifier {
   }
 
   /// Busca una versión más reciente en las releases de GitHub.
+  /// Arranca la vigilancia de versiones nuevas.
+  ///
+  /// **Esto es lo que faltaba**: el comprobador existía, pero solo lo llamaba el
+  /// botón del panel. Se prometía que Traducy avisaba solo y no lo hacía nunca,
+  /// que es la peor combinación posible: quien no abre el panel se queda en una
+  /// versión vieja creyendo que está al día.
+  ///
+  /// La primera comprobación va con retraso a propósito. Al arrancar hay bastante
+  /// trabajo en marcha (posicionar la ventana, comprobar motores, listar
+  /// ventanas), y una petición de red compitiendo con todo eso solo retrasa el
+  /// primer fotograma. Ocho segundos después ya no molesta a nadie.
+  ///
+  /// Luego se repite cada seis horas: una partida larga tiene que enterarse igual
+  /// que quien acaba de abrir el programa.
+  void _startUpdateWatch() {
+    _updateCheckTimer?.cancel();
+    Timer(const Duration(seconds: 8), () {
+      if (_disposed) return;
+      unawaited(checkForUpdate(silent: true));
+    });
+    _updateCheckTimer = Timer.periodic(const Duration(hours: 6), (_) {
+      if (_disposed) return;
+      unawaited(checkForUpdate(silent: true));
+    });
+  }
+
+  Timer? _updateCheckTimer;
+
+  /// `true` cuando el controlador ya se ha liberado.
+  ///
+  /// Los temporizadores de la vigilancia sobreviven a la vista que los creó si
+  /// nadie los para, y una comprobación sobre un controlador liberado acaba en
+  /// una excepción de "usado después de liberar".
+  bool _disposed = false;
+
   Future<void> checkForUpdate({bool silent = false}) async {
     if (_updateState.isBusy) return;
     _setUpdateState(
@@ -1917,6 +1953,8 @@ class AppController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
+    _updateCheckTimer?.cancel();
     regionPreview.dispose();
     subtitlePreview.dispose();
     _topmostTimer?.cancel();
