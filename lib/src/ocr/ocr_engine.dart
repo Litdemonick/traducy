@@ -50,6 +50,69 @@ String _stripInvisible(String input) {
   return out.toString();
 }
 
+/// Rango de escrituras que no separan palabras con espacios: kana, kanji,
+/// hangul, puntuacion de ancho completo y sus formas de anchura media.
+bool _isCjk(int codeUnit) =>
+    (codeUnit >= 0x3000 && codeUnit <= 0x30FF) || // puntuacion CJK y kana
+    (codeUnit >= 0x3400 && codeUnit <= 0x4DBF) || // ideogramas, extension A
+    (codeUnit >= 0x4E00 && codeUnit <= 0x9FFF) || // ideogramas comunes
+    (codeUnit >= 0xAC00 && codeUnit <= 0xD7AF) || // hangul
+    (codeUnit >= 0xF900 &&
+        codeUnit <= 0xFAFF) || // ideogramas de compatibilidad
+    (codeUnit >= 0xFF00 && codeUnit <= 0xFF9F); // formas anchas y kana medio
+
+/// Junta lo que Tesseract separo sin motivo.
+///
+/// Con `-l jpn`, Tesseract mete un espacio entre casi todos los caracteres, y
+/// `preserve_interword_spaces` los conserva porque para el alfabeto latino esos
+/// espacios si son informacion. El resultado es un texto tipo "こ ん に ち は"
+/// que el traductor no reconoce como palabras: traduce caracter por caracter y
+/// devuelve un galimatias. Aqui se quita el espacio solo cuando lo que hay a
+/// cada lado es CJK, asi que un texto mezclado ("HP 100 の 回復") conserva los
+/// espacios que si hacen falta.
+String _joinCjkSpacing(String line) {
+  final StringBuffer out = StringBuffer();
+  for (int i = 0; i < line.length; i++) {
+    final int unit = line.codeUnitAt(i);
+    final bool isSpace = unit == 0x20 || unit == 0x09;
+    if (isSpace && i > 0 && i + 1 < line.length) {
+      if (_isCjk(line.codeUnitAt(i - 1)) && _isCjk(line.codeUnitAt(i + 1))) {
+        continue;
+      }
+    }
+    out.writeCharCode(unit);
+  }
+  return out.toString();
+}
+
+/// Simbolos que el OCR inventa en los bordes del recorte y en las texturas del
+/// fondo. Sueltos no significan nada, pero llegan en cantidad.
+const String _noiseChars = r"|_~^`'\/<>*+=[]{}():;,.-·—–…";
+
+/// `true` si la linea es sobre todo ruido.
+///
+/// Es la defensa contra el sintoma de "muchos signos y cosas raras": una franja
+/// con texto japones y un fondo con textura produce lineas enteras de barras y
+/// puntos junto al texto de verdad. Traducirlas gasta cuota y ensucia el
+/// subtitulo, asi que se descartan antes.
+bool _isMostlyNoise(String line) {
+  int noise = 0;
+  int meaningful = 0;
+  for (int i = 0; i < line.length; i++) {
+    final String character = line[i];
+    if (character == ' ' || character == '\t') continue;
+    if (_noiseChars.contains(character)) {
+      noise++;
+    } else {
+      meaningful++;
+    }
+  }
+  if (meaningful == 0) return true;
+  // Un signo por cada caracter con sentido ya es demasiado: el texto normal
+  // lleva puntuacion, pero no en esa proporcion.
+  return noise > meaningful;
+}
+
 bool _endsSentence(String line) =>
     line.isNotEmpty && _sentenceEndChars.contains(line[line.length - 1]);
 
@@ -63,14 +126,15 @@ String normalizeOcrText(String raw) {
 
   final List<String> keptLines = <String>[];
   for (final String rawLine in raw.split('\n')) {
-    final String line = _stripInvisible(rawLine)
-        .replaceAll(_horizontalSpace, ' ')
-        .trim();
+    final String line = _joinCjkSpacing(
+      _stripInvisible(rawLine).replaceAll(_horizontalSpace, ' ').trim(),
+    ).trim();
     if (line.isEmpty) continue;
 
     // Descarta líneas sin contenido real: solo signos de puntuación o ruido.
     final String meaningful = line.replaceAll(_nonAlphanumeric, '');
     if (meaningful.isEmpty) continue;
+    if (_isMostlyNoise(line)) continue;
     // Una letra suelta casi siempre es un artefacto del borde del recorte;
     // un dígito suelto sí puede ser información válida (un contador, un daño).
     if (meaningful.length == 1 && !_digit.hasMatch(meaningful)) continue;

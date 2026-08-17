@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../i18n/strings.dart';
 import '../models/settings.dart';
 import '../pipeline/pipeline.dart';
 import '../state/app_controller.dart';
@@ -121,6 +122,11 @@ class _OverlayRootState extends State<OverlayRoot> {
           ),
         );
       }
+    }
+    if (s.editSubtitleBox && s.style.showHistory) {
+      // Con el historial dentro, el interior de la caja tambien recibe el raton:
+      // sin registrar su rectangulo, la rueda no llegaria a la lista.
+      rects.add(s.subtitleBox.rect);
     }
     if (s.editSubtitleBox) {
       rects.addAll(_boxHitAreas(s.subtitleBox.rect, locked: s.subtitleLocked));
@@ -249,7 +255,7 @@ class _RegionOverlay extends StatelessWidget {
       locked: controller.settings.regionLocked,
       onToggleLock: controller.toggleRegionLocked,
       accentColor: kRegionAccent,
-      label: 'Zona de captura',
+      label: t.captureZone,
       minWidth: 60,
       minHeight: 30,
       badges: <Widget>[
@@ -287,23 +293,48 @@ class _SubtitleLayer extends StatelessWidget {
     // El texto de muestra solo con la edición activada. Fuera de ahí la caja no
     // existe: no hay marco ni texto de relleno, y en pantalla no aparece nada
     // hasta que hay una traducción de verdad.
-    final String? placeholder = editing ? 'Aquí aparecerá la traducción' : null;
+    final String? placeholder = editing ? t.subtitlePlaceholder : null;
+
+    final SubtitleStyle style = controller.settings.style;
+
+    // Con el historial activado la caja muestra tambien las lineas anteriores y
+    // se puede subir a leerlas; la rueda solo responde con la caja activada,
+    // porque fuera de ahi el interior deja pasar el raton al juego.
+    final bool useHistory = style.showHistory && pipeline != null;
 
     // El repintado del texto se aísla del marco: al arrastrar la caja solo se
     // recoloca, sin volver a maquetar el párrafo con su contorno.
     final Widget subtitle = RepaintBoundary(
       child: pipeline == null
-          ? SubtitleView(
-              content: null,
-              style: controller.settings.style,
-              placeholder: placeholder,
+          ? SubtitleView(content: null, style: style, placeholder: placeholder)
+          : useHistory
+          ? ValueListenableBuilder<List<SubtitleContent>>(
+              valueListenable: pipeline.history,
+              builder:
+                  (BuildContext context, List<SubtitleContent> entries, _) {
+                    if (entries.isEmpty) {
+                      // Todavia no hay nada traducido: se mantiene la vista
+                      // simple para que el texto de muestra de la edicion siga
+                      // apareciendo.
+                      return SubtitleView(
+                        content: null,
+                        style: style,
+                        placeholder: placeholder,
+                      );
+                    }
+                    return SubtitleHistoryView(
+                      entries: entries,
+                      style: style,
+                      interactive: editing,
+                    );
+                  },
             )
           : ValueListenableBuilder<SubtitleContent?>(
               valueListenable: pipeline.subtitle,
               builder: (BuildContext context, SubtitleContent? content, _) {
                 return SubtitleView(
                   content: content,
-                  style: controller.settings.style,
+                  style: style,
                   placeholder: placeholder,
                 );
               },
@@ -316,7 +347,12 @@ class _SubtitleLayer extends StatelessWidget {
         top: box.top,
         width: box.width,
         height: box.height,
-        child: IgnorePointer(child: Center(child: subtitle)),
+        // Recortado al rectángulo de la caja: fuera de la edición no hay marco
+        // a la vista, así que un texto desbordado no tendría ninguna referencia
+        // y parecería que el subtítulo aparece donde quiere.
+        child: IgnorePointer(
+          child: ClipRect(child: Center(child: subtitle)),
+        ),
       );
     }
 
@@ -326,10 +362,14 @@ class _SubtitleLayer extends StatelessWidget {
       locked: controller.settings.subtitleLocked,
       onToggleLock: controller.toggleSubtitleLocked,
       accentColor: kSubtitleAccent,
-      label: 'Subtítulos',
+      label: t.subtitles,
       minWidth: 200,
       minHeight: 60,
       showFill: false,
+      // Con el historial a la vista, el interior necesita la rueda del raton
+      // para desplazarse. La caja ya esta activada a mano desde el panel, asi
+      // que capturar el raton dentro de ella es lo que espera quien la activo.
+      passThroughBody: !useHistory,
       onChanged: (Rect updated) => controller.setSubtitleBox(
         SubtitleBox(
           left: updated.left,
@@ -338,7 +378,7 @@ class _SubtitleLayer extends StatelessWidget {
           height: updated.height,
         ),
       ),
-      child: Center(child: subtitle),
+      child: ClipRect(child: Center(child: subtitle)),
     );
   }
 }
@@ -452,9 +492,9 @@ class _BootScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 14),
-            const Text(
-              'Preparando el overlay…',
-              style: TextStyle(
+            Text(
+              t.preparingOverlay,
+              style: const TextStyle(
                 color: kMuted,
                 fontSize: 12,
                 decoration: TextDecoration.none,
@@ -488,13 +528,13 @@ class _FatalScreen extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            const Row(
+            Row(
               children: <Widget>[
-                Icon(Icons.error_outline, color: kDanger, size: 20),
-                SizedBox(width: 8),
+                const Icon(Icons.error_outline, color: kDanger, size: 20),
+                const SizedBox(width: 8),
                 Text(
-                  'Traducy no pudo arrancar',
-                  style: TextStyle(
+                  t.startupFailed,
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
@@ -516,10 +556,7 @@ class _FatalScreen extends StatelessWidget {
             const SizedBox(height: 16),
             Align(
               alignment: Alignment.centerRight,
-              child: FilledButton(
-                onPressed: onExit,
-                child: const Text('Salir'),
-              ),
+              child: FilledButton(onPressed: onExit, child: Text(t.exit)),
             ),
           ],
         ),

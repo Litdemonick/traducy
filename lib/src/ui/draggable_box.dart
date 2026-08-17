@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../i18n/strings.dart';
+
 /// Qué borde o esquina se está arrastrando.
 enum _DragMode {
   move,
@@ -33,7 +35,16 @@ class DraggableBox extends StatefulWidget {
     this.badges = const <Widget>[],
     this.child,
     this.showFill = true,
+    this.passThroughBody = true,
   });
+
+  /// Si el interior de la caja deja pasar el ratón al programa de debajo.
+  ///
+  /// Es lo normal y la razón de que se pueda jugar con los marcos puestos. Se
+  /// desactiva solo cuando el contenido necesita el ratón para algo, como el
+  /// historial de subtítulos con su scroll: ahí la caja ya está activada a mano
+  /// desde el panel, así que capturar el ratón dentro es lo que se espera.
+  final bool passThroughBody;
 
   /// Rectángulo actual en píxeles lógicos, relativo al área disponible.
   final Rect rect;
@@ -301,6 +312,7 @@ class _DraggableBoxState extends State<DraggableBox> {
         // por los tiradores del borde, igual que una ventana.
         Positioned.fill(
           child: IgnorePointer(
+            ignoring: widget.passThroughBody,
             child: Container(
               decoration: BoxDecoration(
                 color: widget.showFill
@@ -458,7 +470,7 @@ class _LockButton extends StatelessWidget {
               ),
               const SizedBox(width: 4),
               Text(
-                locked ? 'Bloqueada' : 'Libre',
+                locked ? t.locked : t.free,
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w600,

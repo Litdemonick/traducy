@@ -13,6 +13,29 @@ import 'ocr_engine.dart';
 /// Tesseract se cuelga o revienta con una imagen rara, se lleva por delante su
 /// propio proceso y no el de la app. Es la diferencia entre "un fotograma
 /// fallido" y "la aplicación se cerró".
+/// `true` si todos los idiomas pedidos son de escritura CJK.
+///
+/// Se comprueba que lo sean *todos*: con `jpn+eng` hay texto latino de por
+/// medio y sus espacios entre palabras si son informacion que hay que conservar.
+bool _isCjkOnly(String languages) {
+  const Set<String> cjk = <String>{
+    'jpn',
+    'jpn_vert',
+    'chi_sim',
+    'chi_sim_vert',
+    'chi_tra',
+    'chi_tra_vert',
+    'kor',
+    'kor_vert',
+  };
+  final List<String> parts = languages
+      .split('+')
+      .map((String part) => part.trim())
+      .where((String part) => part.isNotEmpty)
+      .toList();
+  return parts.isNotEmpty && parts.every(cjk.contains);
+}
+
 class TesseractOcr implements OcrEngine {
   TesseractOcr({
     required String executablePath,
@@ -269,8 +292,13 @@ class TesseractOcr implements OcrEngine {
       // Evita el aviso "Estimating resolution" en imágenes sin metadatos DPI.
       '--dpi',
       '96',
-      '-c',
-      'preserve_interword_spaces=1',
+      // Solo para escrituras que separan palabras con espacios. En japones,
+      // chino y coreano Tesseract mete un espacio entre casi cada caracter, y
+      // conservarlos deja un texto que el traductor no entiende como palabras.
+      if (!_isCjkOnly(languages)) ...<String>[
+        '-c',
+        'preserve_interword_spaces=1',
+      ],
     ];
 
     Process? process;

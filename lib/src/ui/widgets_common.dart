@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../i18n/strings.dart';
+
 const Color kPanelBackground = Color(0xF21B1B20);
 const Color kPanelSurface = Color(0xFF26262E);
 const Color kAccent = Color(0xFF4FC3F7);
@@ -387,7 +389,7 @@ class ColorPickerRow extends StatelessWidget {
         ),
         if (showAlpha)
           _channelSlider(
-            'Opacidad',
+            t.opacity,
             color.a,
             (double v) => onChanged(color.withValues(alpha: v)),
           ),

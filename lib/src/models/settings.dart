@@ -1,5 +1,7 @@
 import 'dart:ui' show Color, Offset, Rect, Size;
 
+import '../i18n/strings.dart';
+
 /// Modo de transparencia de la ventana overlay.
 enum TransparencyMode {
   /// Alfa real vía composición DWM. Es lo que se ve mejor.
@@ -164,8 +166,12 @@ class SubtitleStyle {
     this.align = SubtitleAlign.center,
     this.showOriginal = false,
     this.originalOpacity = 0.65,
-    this.maxLines = 4,
+    this.maxLines = 6,
     this.fadeMs = 140,
+    this.autoFit = true,
+    this.showHistory = true,
+    this.historyLength = 12,
+    this.minFontScale = 0.55,
   });
 
   final String fontFamily;
@@ -188,6 +194,30 @@ class SubtitleStyle {
   final int maxLines;
   final int fadeMs;
 
+  /// Muestra también las líneas anteriores dentro de la caja, con scroll.
+  ///
+  /// Sin esto, cada traducción borraba la anterior: si te distraes un segundo,
+  /// la frase se ha ido y no hay forma de recuperarla. Con el historial la caja
+  /// se comporta como un registro de la conversación, siempre bajado a lo último.
+  final bool showHistory;
+
+  /// Cuántas líneas se recuerdan.
+  final int historyLength;
+
+  /// Reduce el tamaño de la letra hasta que el texto entra en la caja.
+  ///
+  /// Sin esto, un diálogo largo se corta con puntos suspensivos y se pierde
+  /// justo la parte que hacía falta leer. Con esto, la letra se encoge y el
+  /// texto entra entero.
+  final bool autoFit;
+
+  /// Hasta dónde puede encogerse la letra, como fracción del tamaño elegido.
+  ///
+  /// Existe el límite porque un texto que entra pero no se puede leer no sirve
+  /// de nada: por debajo de la mitad del tamaño elegido es mejor recortar y que
+  /// se vea que falta texto.
+  final double minFontScale;
+
   SubtitleStyle copyWith({
     String? fontFamily,
     double? fontSize,
@@ -208,6 +238,10 @@ class SubtitleStyle {
     double? originalOpacity,
     int? maxLines,
     int? fadeMs,
+    bool? autoFit,
+    bool? showHistory,
+    int? historyLength,
+    double? minFontScale,
   }) => SubtitleStyle(
     fontFamily: fontFamily ?? this.fontFamily,
     fontSize: fontSize ?? this.fontSize,
@@ -228,6 +262,10 @@ class SubtitleStyle {
     originalOpacity: originalOpacity ?? this.originalOpacity,
     maxLines: maxLines ?? this.maxLines,
     fadeMs: fadeMs ?? this.fadeMs,
+    autoFit: autoFit ?? this.autoFit,
+    showHistory: showHistory ?? this.showHistory,
+    historyLength: historyLength ?? this.historyLength,
+    minFontScale: minFontScale ?? this.minFontScale,
   );
 
   Map<String, dynamic> toJson() => <String, dynamic>{
@@ -250,6 +288,10 @@ class SubtitleStyle {
     'originalOpacity': originalOpacity,
     'maxLines': maxLines,
     'fadeMs': fadeMs,
+    'autoFit': autoFit,
+    'showHistory': showHistory,
+    'historyLength': historyLength,
+    'minFontScale': minFontScale,
   };
 
   static SubtitleStyle fromJson(Map<String, dynamic> json) => SubtitleStyle(
@@ -270,8 +312,12 @@ class SubtitleStyle {
     align: _asEnum(json['align'], SubtitleAlign.values, SubtitleAlign.center),
     showOriginal: _asBool(json['showOriginal'], false),
     originalOpacity: _asDouble(json['originalOpacity'], 0.65).clamp(0.1, 1),
-    maxLines: _asInt(json['maxLines'], 4).clamp(1, 12),
+    maxLines: _asInt(json['maxLines'], 6).clamp(1, 12),
     fadeMs: _asInt(json['fadeMs'], 140).clamp(0, 1200),
+    autoFit: _asBool(json['autoFit'], true),
+    showHistory: _asBool(json['showHistory'], true),
+    historyLength: _asInt(json['historyLength'], 12).clamp(2, 60),
+    minFontScale: _asDouble(json['minFontScale'], 0.55).clamp(0.3, 1.0),
   );
 }
 
@@ -566,6 +612,7 @@ class AppSettings {
     this.pipeline = const PipelineSettings(),
     this.engines = const EngineSettings(),
     this.transparency = TransparencyMode.compositor,
+    this.uiLanguage = UiLanguage.auto,
     this.colorKey = 0xFF00FF,
     this.startInConfigMode = true,
     this.passthroughInConfig = true,
@@ -626,6 +673,10 @@ class AppSettings {
   final PipelineSettings pipeline;
   final EngineSettings engines;
   final TransparencyMode transparency;
+
+  /// Idioma en el que se ve la aplicación. Distinto del idioma al que se
+  /// traduce: ese vive en [EngineSettings.targetLanguage].
+  final UiLanguage uiLanguage;
   final int colorKey;
   final bool startInConfigMode;
 
@@ -659,6 +710,7 @@ class AppSettings {
     PipelineSettings? pipeline,
     EngineSettings? engines,
     TransparencyMode? transparency,
+    UiLanguage? uiLanguage,
     int? colorKey,
     bool? startInConfigMode,
     bool? passthroughInConfig,
@@ -683,6 +735,7 @@ class AppSettings {
     pipeline: pipeline ?? this.pipeline,
     engines: engines ?? this.engines,
     transparency: transparency ?? this.transparency,
+    uiLanguage: uiLanguage ?? this.uiLanguage,
     colorKey: colorKey ?? this.colorKey,
     startInConfigMode: startInConfigMode ?? this.startInConfigMode,
     passthroughInConfig: passthroughInConfig ?? this.passthroughInConfig,
@@ -710,6 +763,7 @@ class AppSettings {
     'pipeline': pipeline.toJson(),
     'engines': engines.toJson(),
     'transparency': transparency.name,
+    'uiLanguage': uiLanguage.name,
     'colorKey': colorKey,
     'startInConfigMode': startInConfigMode,
     'passthroughInConfig': passthroughInConfig,
@@ -753,6 +807,7 @@ class AppSettings {
       TransparencyMode.values,
       TransparencyMode.compositor,
     ),
+    uiLanguage: _asEnum(json['uiLanguage'], UiLanguage.values, UiLanguage.auto),
     colorKey: _asInt(json['colorKey'], 0xFF00FF),
     startInConfigMode: _asBool(json['startInConfigMode'], true),
     passthroughInConfig: _asBool(json['passthroughInConfig'], true),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:traducy/src/i18n/strings.dart';
 import 'package:traducy/src/ui/draggable_box.dart';
 
 /// Alto de la franja reservada a la barra de título dentro del marco. El marco
@@ -62,6 +63,11 @@ Offset _paintedTopLeft(WidgetTester tester) {
 }
 
 void main() {
+  // La interfaz habla el idioma del sistema, y el de la máquina de pruebas no
+  // tiene por qué ser el mismo. Se fija para que las aserciones comparen contra
+  // un texto conocido en lugar de depender de la configuración del equipo.
+  setUpAll(() => L10n.apply(UiLanguage.spanish));
+
   testWidgets(
     'el interior de la caja deja pasar los clics a lo que hay detrás',
     (WidgetTester tester) async {

@@ -717,9 +717,56 @@ class _RegionTab extends StatelessWidget {
 
         const SectionTitle('Zona de captura'),
         const HelpText(
-          'Sitúa el rectángulo verde sobre el texto del juego. El candado de su '
-          'barra evita moverlo sin querer una vez ajustado.',
+          'Lo más directo es detectar el juego: la zona se coloca sola en su '
+          'parte baja y se mueve con la ventana. Si prefieres situarla a mano, '
+          'usa los botones de abajo y ajusta el rectángulo verde.',
         ),
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton.icon(
+            onPressed: () => controller.detectGameWindow(),
+            icon: const Icon(Icons.videogame_asset, size: 16),
+            label: const Text('Detectar el juego'),
+            style: FilledButton.styleFrom(
+              backgroundColor: kRegionAccent,
+              foregroundColor: const Color(0xFF11131A),
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              textStyle: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ),
+        if (s.regionMode == RegionMode.followWindow &&
+            s.followWindowTitle.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Row(
+              children: <Widget>[
+                const Icon(Icons.link, size: 13, color: kRegionAccent),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'Anclada a "${s.followWindowTitle}"',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: kRegionAccent, fontSize: 11),
+                  ),
+                ),
+                TextButton(
+                  onPressed: controller.stopFollowingWindow,
+                  style: TextButton.styleFrom(
+                    foregroundColor: kMuted,
+                    visualDensity: VisualDensity.compact,
+                    textStyle: const TextStyle(fontSize: 11),
+                  ),
+                  child: const Text('Desanclar'),
+                ),
+              ],
+            ),
+          ),
+        const SizedBox(height: 8),
         Row(
           children: <Widget>[
             Expanded(
@@ -1257,6 +1304,59 @@ class _StyleTab extends StatelessWidget {
           divisions: 9,
           onChanged: (double v) => update(st.copyWith(maxLines: v.round())),
         ),
+        SwitchRow(
+          label: 'Historial en la caja',
+          subtitle: st.showHistory
+              ? 'Se ven también las líneas anteriores, con scroll. Activa la '
+                    'caja para poder subir a leerlas con la rueda.'
+              : 'Solo la última línea traducida.',
+          value: st.showHistory,
+          onChanged: (bool v) => update(st.copyWith(showHistory: v)),
+        ),
+        if (st.showHistory)
+          SliderRow(
+            label: 'Líneas recordadas',
+            value: st.historyLength.toDouble(),
+            min: 2,
+            max: 40,
+            divisions: 38,
+            onChanged: (double v) =>
+                update(st.copyWith(historyLength: v.round())),
+          ),
+        if (st.showHistory)
+          Padding(
+            padding: const EdgeInsets.only(top: 4, bottom: 2),
+            child: OutlinedButton.icon(
+              onPressed: controller.clearSubtitleHistory,
+              icon: const Icon(Icons.delete_sweep, size: 15),
+              label: const Text('Vaciar el historial'),
+              style: _outlined,
+            ),
+          ),
+        SwitchRow(
+          label: 'Ajustar el texto a la caja',
+          subtitle: st.autoFit
+              ? 'La letra se encoge lo necesario para que entre el texto entero.'
+              : 'Tamaño fijo: el texto largo se recorta.',
+          value: st.autoFit,
+          onChanged: (bool v) => update(st.copyWith(autoFit: v)),
+        ),
+        if (st.autoFit)
+          SliderRow(
+            label: 'Encogido máximo',
+            value: st.minFontScale * 100,
+            min: 30,
+            max: 100,
+            decimals: 0,
+            suffix: ' %',
+            onChanged: (double v) => update(st.copyWith(minFontScale: v / 100)),
+          ),
+        if (st.autoFit)
+          const HelpText(
+            'Hasta dónde puede encogerse la letra. Un texto que entra pero no se '
+            'puede leer no sirve, así que por debajo de este límite se recorta '
+            'en lugar de seguir reduciendo.',
+          ),
         Row(
           children: <Widget>[
             Expanded(

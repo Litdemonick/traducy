@@ -147,6 +147,14 @@ class TranslationPipeline {
   final ValueNotifier<SubtitleContent?> subtitle =
       ValueNotifier<SubtitleContent?>(null);
 
+  /// Las últimas líneas traducidas, de la más antigua a la más reciente.
+  ///
+  /// Es una lista aparte y no una simple pila de `subtitle` porque el subtítulo
+  /// actual se retira cuando el texto deja de verse en pantalla, y el historial
+  /// tiene que sobrevivir a eso: lo que ya se dijo sigue siendo lo que se dijo.
+  final ValueNotifier<List<SubtitleContent>> history =
+      ValueNotifier<List<SubtitleContent>>(const <SubtitleContent>[]);
+
   Timer? _timer;
   bool _busy = false;
   bool _disposed = false;
@@ -461,6 +469,7 @@ class TranslationPipeline {
             clearHint: true,
             clearStage: true,
           );
+          _hurryNextCycle();
           return;
         }
 
@@ -543,6 +552,9 @@ class TranslationPipeline {
         _pendingCount++;
       }
       if (_pendingCount < _settings.pipeline.stabilityFrames) {
+        // Confirmar cuanto antes: mientras se espera, el subtitulo todavia no
+        // esta en pantalla y esa espera es la que se nota.
+        _hurryNextCycle();
         _setStatus(
           state: PipelineState.running,
           message: 'Esperando texto estable',
@@ -596,11 +608,13 @@ class TranslationPipeline {
 
     _lastTranslatedKey = key;
     _lastTextSeenAt = DateTime.now();
-    subtitle.value = SubtitleContent(
+    final SubtitleContent content = SubtitleContent(
       translated: translation.text.isEmpty ? text : translation.text,
       original: text,
       fromCache: translation.fromCache,
     );
+    subtitle.value = content;
+    _remember(content);
 
     _setStatus(
       state: PipelineState.running,
@@ -617,6 +631,46 @@ class TranslationPipeline {
       clearHint: true,
       clearStage: true,
     );
+  }
+
+  /// Guarda la línea en el historial, recortándolo por el final.
+  ///
+  /// Se crea una lista nueva en lugar de modificar la existente: `ValueNotifier`
+  /// compara por identidad, y mutar la lista en su sitio no avisaría a nadie.
+  void _remember(SubtitleContent content) {
+    final int limit = _settings.style.historyLength;
+    final List<SubtitleContent> updated = <SubtitleContent>[
+      ...history.value,
+      content,
+    ];
+    history.value = updated.length > limit
+        ? updated.sublist(updated.length - limit)
+        : updated;
+  }
+
+  /// Vacía el historial. Lo usa el botón de la interfaz y el arranque.
+  void clearHistory() {
+    if (history.value.isEmpty) return;
+    history.value = const <SubtitleContent>[];
+  }
+
+  /// Adelanta el siguiente ciclo cuando hay un texto esperando confirmacion.
+  ///
+  /// La espera de estabilidad existe para no traducir dialogos a medio escribir,
+  /// pero cumplirla al ritmo normal de captura anade un intervalo completo al
+  /// tiempo que tarda en aparecer el subtitulo. Confirmando antes se conserva la
+  /// proteccion contra el efecto maquina de escribir y se recorta la espera a la
+  /// mitad, sin gastar CPU en los fotogramas en los que no hay nada pendiente.
+  void _hurryNextCycle() {
+    if (_disposed || _timer == null) return;
+    const int hurryMs = 110;
+    if (_settings.pipeline.intervalMs <= hurryMs) return;
+    _timer?.cancel();
+    _timer = Timer(const Duration(milliseconds: hurryMs), () {
+      // Se vuelve al ritmo normal en cuanto se ha atendido el ciclo urgente.
+      _restartTimer();
+      unawaited(_tick());
+    });
   }
 
   /// Retira el subtítulo cuando lleva demasiado tiempo sin volver a detectarse
@@ -724,5 +778,6 @@ class TranslationPipeline {
     _translator.dispose();
     status.dispose();
     subtitle.dispose();
+    history.dispose();
   }
 }

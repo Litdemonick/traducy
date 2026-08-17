@@ -13,10 +13,10 @@
 
 #define MyAppName "Traducy"
 ; Version visible, admite sufijo de letras para revisiones pequenas (1.0.0.bs).
-#define MyAppVersion "1.0.0.c"
+#define MyAppVersion "1.0.0.d"
 ; La misma version en cuatro numeros. Windows almacena la version del ejecutable
 ; asi, y un sufijo de letras no es un numero: de ahi que haya dos formas.
-#define MyAppVersionNumeric "1.0.0.3"
+#define MyAppVersionNumeric "1.0.0.4"
 #define MyAppPublisher "Litdemonick"
 #define MyAppAuthor "Litdemonick"
 #define MyAppUrl "https://github.com/Litdemonick/traducy"
@@ -312,6 +312,67 @@ begin
     ExpandConstant('{cm:AboutHeading}') + NewLine + Space +
     ExpandConstant('{cm:AboutProject}');
 end;
+
+{ ------------------------------------------------------------ desinstalacion }
+
+{ Cierra Traducy antes de desinstalar.
+
+  Inno cierra las aplicaciones por su cuenta al INSTALAR (CloseApplications),
+  pero no al desinstalar. Sin esto, desinstalar con Traducy abierto deja el .exe
+  y las DLL en uso: Windows no los borra, la carpeta sobrevive con medio programa
+  dentro y hay que reiniciar para acabar el trabajo.
+
+  Se termina el proceso sin contemplaciones. Es seguro: los ajustes se escriben
+  de forma atomica (fichero temporal y renombrado), asi que cortar el programa a
+  media escritura no puede dejar el fichero a medias... y ademas se va a borrar. }
+procedure CloseRunningApp();
+var
+  ResultCode: Integer;
+begin
+  Exec(ExpandConstant('{sys}	askkill.exe'), '/IM {#MyAppExeName} /F',
+    '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  { Un margen para que Windows suelte los ficheros que tenia abiertos. Sin el,
+    el borrado puede llegar antes que la liberacion de los handles. }
+  Sleep(700);
+end;
+
+function InitializeUninstall(): Boolean;
+begin
+  CloseRunningApp();
+  Result := True;
+end;
+
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+begin
+  if CurUninstallStep = usUninstall then
+  begin
+    { Segunda pasada: entre la pantalla de confirmacion y este momento el usuario
+      pudo volver a abrir Traducy. }
+    CloseRunningApp();
+    Exit;
+  end;
+
+  if CurUninstallStep <> usPostUninstall then
+    Exit;
+
+  { Lo que la desinstalacion normal no cubre: ficheros que la aplicacion creo
+    despues de instalarse. Los idiomas del OCR descargados, los instaladores del
+    actualizador y las copias de ajustes corruptos no los instalo el setup, asi
+    que no figuran en su lista de cosas que borrar. }
+  DelTree(ExpandConstant('{app}\datos'), True, True, True);
+  DelTree(ExpandConstant('{app}\data'), True, True, True);
+
+  { Y por ultimo la carpeta del programa.
+
+    RemoveDir solo borra carpetas vacias, y eso es exactamente lo que se quiere:
+    si alguien instalo Traducy dentro de una carpeta que ya tenia cosas suyas,
+    sus ficheros siguen ahi y la carpeta se queda. Un DelTree sobre la carpeta de
+    instalacion seria mas contundente y podria llevarse por delante lo que no es
+    suyo. }
+  RemoveDir(ExpandConstant('{app}'));
+end;
+
+{ ------------------------------------------------------------- instalacion }
 
 function NextButtonClick(CurPageID: Integer): Boolean;
 begin

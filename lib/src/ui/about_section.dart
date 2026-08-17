@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../core/about.dart';
 import '../core/app_paths.dart';
 import '../core/version.dart';
+import '../i18n/strings.dart';
 import '../state/app_controller.dart';
 import 'widgets_common.dart';
 import 'zone_console.dart';
@@ -29,7 +30,7 @@ class AboutSection extends StatelessWidget {
 
   Future<void> _copy(String value, String label) async {
     await Clipboard.setData(ClipboardData(text: value));
-    onCopied('$label copiado al portapapeles');
+    onCopied(t.copiedToClipboard(label));
   }
 
   @override
@@ -37,7 +38,7 @@ class AboutSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        const SectionTitle('Acerca de Traducy'),
+        SectionTitle(t.aboutTitle),
 
         Container(
           padding: const EdgeInsets.all(12),
@@ -94,9 +95,9 @@ class AboutSection extends StatelessWidget {
                           ],
                         ),
                         const SizedBox(height: 2),
-                        const Text(
-                          About.tagline,
-                          style: TextStyle(color: kMuted, fontSize: 11.5),
+                        Text(
+                          t.appTagline,
+                          style: const TextStyle(color: kMuted, fontSize: 11.5),
                         ),
                       ],
                     ),
@@ -104,9 +105,9 @@ class AboutSection extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 10),
-              const Text(
-                About.description,
-                style: TextStyle(
+              Text(
+                t.aboutDescription,
+                style: const TextStyle(
                   color: Colors.white70,
                   fontSize: 11.5,
                   height: 1.4,
@@ -116,51 +117,48 @@ class AboutSection extends StatelessWidget {
           ),
         ),
 
-        const SectionTitle('Proyecto'),
+        SectionTitle(t.sectionProject),
         _InfoRow(
           icon: Icons.person_outline,
-          label: 'Creador',
+          label: t.creator,
           value: About.author,
-          onCopy: () => _copy(About.authorUrl, 'Perfil del creador'),
+          onCopy: () => _copy(About.authorUrl, t.copyAuthorProfile),
         ),
         _InfoRow(
           icon: Icons.code,
-          label: 'Repositorio',
+          label: t.repository,
           value: '${About.githubOwner}/${About.githubRepo}',
-          onCopy: () => _copy(About.repoUrl, 'Enlace del repositorio'),
+          onCopy: () => _copy(About.repoUrl, t.copyRepoLink),
         ),
         _InfoRow(
           icon: Icons.new_releases_outlined,
-          label: 'Versiones',
-          value: 'Descargas y notas de cada versión',
-          onCopy: () => _copy(About.releasesUrl, 'Enlace de las versiones'),
+          label: t.releases,
+          value: t.releasesValue,
+          onCopy: () => _copy(About.releasesUrl, t.copyReleasesLink),
         ),
         _InfoRow(
           icon: Icons.bug_report_outlined,
-          label: 'Fallos',
-          value: 'Reportar un problema o pedir algo',
-          onCopy: () => _copy(About.issuesUrl, 'Enlace de incidencias'),
+          label: t.bugs,
+          value: t.bugsValue,
+          onCopy: () => _copy(About.issuesUrl, t.copyIssuesLink),
         ),
         _InfoRow(
           icon: Icons.numbers,
-          label: 'Versión',
-          value: '$appVersion  ·  compilación $appVersionNumeric',
-          onCopy: () => _copy(appVersion, 'Número de versión'),
+          label: t.version,
+          value: t.versionValue(appVersion, appVersionNumeric),
+          onCopy: () => _copy(appVersion, t.copyVersionNumber),
         ),
 
-        const SectionTitle('Dónde se guarda todo'),
+        SectionTitle(t.sectionStorage),
         HelpText(
-          AppPaths.instance.isBesideProgram
-              ? 'Junto al programa, en la carpeta que elegiste al instalar. '
-                    'Ajustes, idiomas del OCR y actualizaciones descargadas.'
-              : 'En la carpeta del usuario.',
+          AppPaths.instance.isBesideProgram ? t.storageBeside : t.storageUser,
         ),
         _InfoRow(
           icon: Icons.folder_outlined,
-          label: 'Carpeta',
+          label: t.folder,
           value: AppPaths.instance.dataDirectory.path,
           onCopy: () =>
-              _copy(AppPaths.instance.dataDirectory.path, 'Ruta de los datos'),
+              _copy(AppPaths.instance.dataDirectory.path, t.copyDataPath),
         ),
         if (AppPaths.instance.fallbackReason != null)
           NoticeCard(
@@ -168,13 +166,13 @@ class AboutSection extends StatelessWidget {
             severity: NoticeSeverity.warning,
           ),
 
-        const SectionTitle('Hecho con'),
+        SectionTitle(t.sectionBuiltWith),
         for (final (String name, String license, String url) in About.credits)
           _InfoRow(
             icon: Icons.extension_outlined,
             label: name,
             value: license,
-            onCopy: () => _copy(url, 'Enlace de $name'),
+            onCopy: () => _copy(url, t.copyLinkOf(name)),
           ),
 
         ZoneConsole(controller: controller, zone: PanelZone.about),
@@ -223,7 +221,7 @@ class _InfoRow extends StatelessWidget {
             ),
           ),
           IconButton(
-            tooltip: 'Copiar el enlace',
+            tooltip: t.copyLinkTooltip,
             icon: const Icon(Icons.copy, size: 13),
             color: kMuted,
             visualDensity: VisualDensity.compact,

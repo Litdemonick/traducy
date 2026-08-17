@@ -352,6 +352,63 @@ int _enumCallback(int hwnd, int lParam) {
 }
 
 /// Lista las ventanas visibles de otros programas, ordenadas por título.
+/// Ventana que tiene el foco ahora mismo, o `null` si no es utilizable.
+///
+/// Traducy no compite por el foco: su ventana lleva `WS_EX_NOACTIVATE` mientras
+/// se juega, asi que la ventana en primer plano es casi siempre la del juego.
+/// Aun asi se comprueba que no sea la nuestra, porque con el panel abierto si
+/// puede tenerlo.
+ForeignWindow? foregroundWindow() {
+  try {
+    final int hwnd = w.getForegroundWindow();
+    if (hwnd == 0) return null;
+    return describeWindow(hwnd);
+  } catch (e) {
+    log.w('overlay', 'GetForegroundWindow fallo: $e');
+    return null;
+  }
+}
+
+/// Datos de una ventana concreta, o `null` si no sirve como objetivo.
+ForeignWindow? describeWindow(int hwnd) {
+  if (hwnd == 0) return null;
+  if (w.isWindowVisible(hwnd) == 0 || w.isIconic(hwnd) != 0) return null;
+
+  final Pointer<Uint32> pid = calloc<Uint32>();
+  try {
+    w.getWindowThreadProcessId(hwnd, pid);
+    if (pid.value == w.getCurrentProcessId()) return null;
+  } finally {
+    calloc.free(pid);
+  }
+
+  final Pointer<Utf16> buffer = calloc<Uint16>(512).cast<Utf16>();
+  final Pointer<w.Rect> rect = calloc<w.Rect>();
+  try {
+    final int length = w.getWindowText(hwnd, buffer, 512);
+    if (length <= 0) return null;
+    final String title = buffer.toDartString(length: length).trim();
+    if (title.isEmpty) return null;
+    if (w.getWindowRect(hwnd, rect) == 0) return null;
+    final int width = rect.ref.right - rect.ref.left;
+    final int height = rect.ref.bottom - rect.ref.top;
+    if (width < 120 || height < 80) return null;
+    return ForeignWindow(
+      hwnd: hwnd,
+      title: title,
+      left: rect.ref.left,
+      top: rect.ref.top,
+      width: width,
+      height: height,
+    );
+  } catch (_) {
+    return null;
+  } finally {
+    calloc.free(buffer);
+    calloc.free(rect);
+  }
+}
+
 List<ForeignWindow> listTopLevelWindows() {
   _enumAccumulator.clear();
   try {

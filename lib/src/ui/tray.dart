@@ -1,6 +1,7 @@
 import 'package:tray_manager/tray_manager.dart';
 
 import '../core/logx.dart';
+import '../i18n/strings.dart';
 
 /// Claves de los elementos del menú de la bandeja.
 ///
@@ -31,24 +32,19 @@ class TrayService {
   Future<bool> setUp() async {
     try {
       await trayManager.setIcon(_iconAsset);
-      await trayManager.setToolTip(
-        'Traducy — clic para abrir, clic derecho para opciones',
-      );
+      await trayManager.setToolTip(t.trayTooltip);
       await trayManager.setContextMenu(
         Menu(
           items: <MenuItem>[
-            MenuItem(key: TrayAction.show, label: 'Abrir Traducy'),
+            MenuItem(key: TrayAction.show, label: t.trayOpen),
             MenuItem.separator(),
-            MenuItem(
-              key: TrayAction.togglePause,
-              label: 'Pausar o reanudar la traducción',
-            ),
+            MenuItem(key: TrayAction.togglePause, label: t.trayTogglePause),
             MenuItem(
               key: TrayAction.toggleSubtitles,
-              label: 'Mostrar u ocultar los subtítulos',
+              label: t.trayToggleSubtitles,
             ),
             MenuItem.separator(),
-            MenuItem(key: TrayAction.exit, label: 'Salir de Traducy'),
+            MenuItem(key: TrayAction.exit, label: t.trayExit),
           ],
         ),
       );

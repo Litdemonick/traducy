@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/updater.dart';
+import '../i18n/strings.dart';
 import '../state/app_controller.dart';
 import 'widgets_common.dart';
 
@@ -26,12 +27,12 @@ class UpdateSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        const SectionTitle('Actualizaciones'),
+        SectionTitle(t.updates),
         Row(
           children: <Widget>[
             Expanded(
               child: Text(
-                'Versión instalada: ${controller.currentVersion}',
+                t.installedVersion(controller.currentVersion),
                 style: const TextStyle(color: Colors.white, fontSize: 12),
               ),
             ),
@@ -40,7 +41,7 @@ class UpdateSection extends StatelessWidget {
                   ? null
                   : () => controller.checkForUpdate(),
               icon: const Icon(Icons.system_update_alt, size: 15),
-              label: const Text('Comprobar'),
+              label: Text(t.checkNow),
               style: OutlinedButton.styleFrom(
                 foregroundColor: kAccent,
                 side: const BorderSide(color: Color(0xFF3A3A44)),
@@ -56,11 +57,7 @@ class UpdateSection extends StatelessWidget {
             ),
           ],
         ),
-        const HelpText(
-          'Al detectarse una versión nueva, Traducy detiene la traducción y '
-          'queda bloqueado hasta actualizar: una versión vieja funcionando a '
-          'medias parece un fallo de la propia aplicación.',
-        ),
+        HelpText(t.updateBlockExplanation),
 
         if (state.stage == UpdateStage.checking)
           const Padding(
@@ -74,16 +71,13 @@ class UpdateSection extends StatelessWidget {
 
         if (state.stage == UpdateStage.available && release != null)
           NoticeCard(
-            message: 'Versión ${release.version} disponible',
-            hint:
-                'Se descargará el instalador (${release.readableSize}) y la '
-                'versión nueva se instalará encima de la actual conservando tus '
-                'ajustes y los idiomas descargados.',
+            message: t.updateAvailable(release.version),
+            hint: t.updateAvailableHint(release.readableSize),
             severity: NoticeSeverity.warning,
             action: FilledButton.icon(
               onPressed: onInstall,
               icon: const Icon(Icons.download, size: 15),
-              label: Text('Actualizar a ${release.version}'),
+              label: Text(t.updateToVersion(release.version)),
               style: FilledButton.styleFrom(
                 backgroundColor: kAccent,
                 foregroundColor: const Color(0xFF11131A),
@@ -102,9 +96,7 @@ class UpdateSection extends StatelessWidget {
         if (state.stage == UpdateStage.failed)
           NoticeCard(
             message: state.message,
-            hint:
-                'También puedes descargarla a mano desde '
-                '${controller.releasesPageUrl}',
+            hint: t.updateManualFrom(controller.releasesPageUrl),
             severity: NoticeSeverity.error,
           ),
 
@@ -188,30 +180,24 @@ class UpdateBlockingScreen extends StatelessWidget {
     switch (state.stage) {
       case UpdateStage.available:
         return <Widget>[
-          _title('Actualización necesaria'),
+          _title(t.updateRequiredTitle),
           const SizedBox(height: 10),
-          _text(
-            'Hay una versión nueva de Traducy (${release?.version ?? ''}). '
-            'La traducción se ha detenido y la aplicación queda bloqueada hasta '
-            'que se instale.',
-          ),
+          _text(t.updateRequiredBody(release?.version ?? '')),
           const SizedBox(height: 8),
           _text(
-            'Se descargará el instalador (${release?.readableSize ?? ''}), '
-            'Traducy se cerrará y la versión nueva se instalará encima de la '
-            'actual. Tus ajustes y los idiomas descargados se conservan.',
+            t.updateRequiredDetail(release?.readableSize ?? ''),
             muted: true,
           ),
           const SizedBox(height: 18),
           _actions(<Widget>[
-            _primary('Actualizar ahora', Icons.download, onInstall),
-            _secondary('Salir', onExit),
+            _primary(t.updateNow, Icons.download, onInstall),
+            _secondary(t.exit, onExit),
           ]),
         ];
 
       case UpdateStage.downloading:
         return <Widget>[
-          _title('Descargando ${release?.version ?? ''}'),
+          _title(t.downloadingVersion(release?.version ?? '')),
           const SizedBox(height: 16),
           LinearProgressIndicator(
             // Sin tamaño conocido, indeterminada: una barra clavada en cero
@@ -224,12 +210,12 @@ class UpdateBlockingScreen extends StatelessWidget {
           const SizedBox(height: 12),
           _text(state.readableProgress, muted: true),
           const SizedBox(height: 6),
-          _warn('No cierres la aplicación.'),
+          _warn(t.doNotClose),
         ];
 
       case UpdateStage.ready:
         return <Widget>[
-          _title('Instalando la actualización'),
+          _title(t.installingUpdate),
           const SizedBox(height: 16),
           const LinearProgressIndicator(
             minHeight: 4,
@@ -237,34 +223,27 @@ class UpdateBlockingScreen extends StatelessWidget {
             backgroundColor: Color(0xFF2E2E38),
           ),
           const SizedBox(height: 12),
-          _text(
-            'Traducy se va a cerrar y el instalador seguirá solo. Al terminar se '
-            'abrirá la versión nueva.',
-            muted: true,
-          ),
+          _text(t.installingDetail, muted: true),
         ];
 
       case UpdateStage.failed:
         return <Widget>[
-          _title('No se pudo actualizar'),
+          _title(t.updateFailedTitle),
           const SizedBox(height: 10),
           _text(state.message),
           const SizedBox(height: 8),
-          _text(
-            'También puedes descargarla a mano desde $releasesPageUrl',
-            muted: true,
-          ),
+          _text(t.updateManualFrom(releasesPageUrl), muted: true),
           const SizedBox(height: 18),
           _actions(<Widget>[
-            _primary('Reintentar', Icons.refresh, onRetry),
-            _secondary('Salir', onExit),
+            _primary(t.retry, Icons.refresh, onRetry),
+            _secondary(t.exit, onExit),
           ]),
         ];
 
       case UpdateStage.checking:
       case UpdateStage.idle:
         return <Widget>[
-          _title('Comprobando actualizaciones'),
+          _title(t.checkingUpdates),
           const SizedBox(height: 16),
           const LinearProgressIndicator(
             minHeight: 3,

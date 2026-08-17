@@ -33,6 +33,22 @@ void main() {
       expect(normalizeOcrText('7'), '7');
     });
 
+    test('junta los caracteres japoneses que Tesseract separa', () {
+      // Con -l jpn, Tesseract mete un espacio entre casi cada caracter. Dejarlos
+      // hace que el traductor no reconozca palabras y devuelva un galimatias.
+      expect(normalizeOcrText('こ ん に ち は'), 'こんにちは');
+    });
+
+    test('conserva el espacio si a un lado no hay japonés', () {
+      expect(normalizeOcrText('HP 100 の 回復'), 'HP 100 の回復');
+    });
+
+    test('descarta las líneas que son sobre todo signos', () {
+      // El caso real: una franja con texto japonés sobre un fondo con textura
+      // deja líneas enteras de barras y puntos junto al texto de verdad.
+      expect(normalizeOcrText('|_/ <>~ 8\nこんにちは'), 'こんにちは');
+    });
+
     test('colapsa espacios múltiples', () {
       expect(normalizeOcrText('Hola     mundo'), 'Hola mundo');
     });

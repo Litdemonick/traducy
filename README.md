@@ -1,6 +1,6 @@
 <div align="center">
 
-# Traducy
+<img src="assets/logo_traducy.png" alt="Traducy" width="360">
 
 **Traductor de pantalla en tiempo real para Windows**
 
@@ -47,7 +47,7 @@ idioma sin traducción oficial.
 | | |
 |---|---|
 | [Cómo funciona](#cómo-funciona) · [Requisitos](#requisitos) · [Primeros pasos](#primeros-pasos) | Empezar |
-| [El overlay no te bloquea el ratón](#el-overlay-no-te-bloquea-el-ratón) · [Minimizar y modo juego](#minimizar-y-modo-juego) · [Atajos globales](#atajos-globales) · [Los dos candados](#los-dos-candados) | Uso diario |
+| [El overlay no te bloquea el ratón](#el-overlay-no-te-bloquea-el-ratón) · [Minimizar y modo juego](#minimizar-y-modo-juego) · [Atajos globales](#atajos-globales) · [La caja de subtítulos](#la-caja-de-subtítulos) · [Los dos candados](#los-dos-candados) | Uso diario |
 | [Motores de traducción](#motores-de-traducción) · [Ajustar la precisión del OCR](#ajustar-la-precisión-del-ocr) · [Problemas frecuentes](#problemas-frecuentes) | Afinar |
 | [Compilar y ejecutar](#compilar-y-ejecutar) · [Estructura del código](#estructura-del-código) · [Pruebas](#pruebas) | Desarrollo |
 | [Crear el instalador](#crear-el-instalador-para-compartir) · [Versiones](#versiones) · [Actualizaciones automáticas](#actualizaciones-automáticas) | Publicar |
@@ -108,9 +108,11 @@ encuentra, la ruta se puede indicar a mano en **Diagnóstico**.
    te lo dice en lugar de quedarse callado.
 2. Arranca Traducy. Se abre en modo configuración con el panel, que se arrastra
    desde su cabecera a donde estorbe menos.
-3. En **Zona**, pulsa *Activar zona de captura*. Aparece el rectángulo verde:
-   usa *Banda inferior* (donde casi todos los juegos ponen los diálogos) o
-   *Pantalla completa*, ajústalo y pulsa el candado de su barra para fijarlo.
+3. En **Zona**, pulsa **Detectar el juego**. Traducy encuentra su ventana y
+   coloca la zona en su parte baja, donde ponen el diálogo casi todos; además
+   queda anclada, así que mover el juego no obliga a recolocar nada.
+   Si prefieres situarla a mano, activa *Activar zona de captura* y usa *Banda
+   inferior* o *Pantalla completa* sobre el rectángulo verde.
 4. En **Idiomas**, elige el idioma del juego (p. ej. Japonés) y el de destino
    (Español por defecto).
 5. Pulsa **Traducir**.
@@ -162,6 +164,20 @@ En el icono de la bandeja:
 Funcionan aunque el juego tenga el foco. Si otro programa ya los tiene tomados,
 Traducy lo anota en el diagnóstico y sigue funcionando desde el panel.
 
+## La caja de subtítulos
+
+- **Se adapta a su tamaño.** La letra se encoge lo necesario para que el texto
+  entre entero en la caja, y nada se pinta fuera de ella: la caja que colocas es
+  exactamente lo que se ve.
+- **Guarda las líneas anteriores.** La caja es un registro de la conversación, no
+  una frase que se borra sola: lo último abajo, lo anterior encima y atenuado.
+  Baja sola a lo nuevo salvo que hayas subido a leer.
+- **Con scroll**, disponible al activar la caja desde el panel. Fuera de ahí la
+  caja deja pasar el ratón al juego, y capturar la rueda significaría capturar
+  también los clics.
+
+Ambas cosas se ajustan en **Estilo**.
+
 ## Los dos candados
 
 La zona de captura y la caja de subtítulos son independientes y **cada una tiene
@@ -202,6 +218,10 @@ cambiar de motor:
 | **Reducir ruido** | Vídeo comprimido o escalado. |
 | **Cambio mínimo** | Bájalo si no detecta diálogos nuevos; súbelo si traduce de más con fondos animados. |
 | **Estabilidad** | Súbelo a 3 o 4 si el juego escribe el diálogo letra a letra. |
+
+Para japonés, chino y coreano, Traducy junta los caracteres que Tesseract separa
+y descarta las líneas que son sobre todo signos: sin eso, el traductor recibe
+`こ ん に ち は` en lugar de `こんにちは` y devuelve un galimatías.
 
 ## Problemas frecuentes
 
@@ -464,7 +484,9 @@ dart analyze
 
 <div align="center">
 
-Hecho por [Litdemonick](https://github.com/Litdemonick)
+<img src="assets/logo_mark.png" alt="" width="46">
+
+**Traducy** · hecho por [Litdemonick](https://github.com/Litdemonick)
 
 [Repositorio](https://github.com/Litdemonick/traducy) ·
 [Versiones](https://github.com/Litdemonick/traducy/releases) ·

@@ -10,6 +10,7 @@ import '../core/logx.dart';
 import '../core/updater.dart';
 import '../core/version.dart';
 import '../models/languages.dart';
+import '../i18n/strings.dart';
 import '../models/settings.dart';
 import '../models/settings_store.dart';
 import '../native/overlay_native.dart';
@@ -130,6 +131,9 @@ class AppController extends ChangeNotifier {
   Future<void> initialize() async {
     try {
       _settings = await _store.load();
+      // Antes que cualquier otra cosa: el resto del arranque ya genera mensajes
+      // que el usuario va a leer en la consola del panel.
+      L10n.apply(_settings.uiLanguage);
       _configMode = _settings.startInConfigMode;
 
       await _positionWindowOverVirtualScreen();
@@ -884,6 +888,23 @@ class AppController extends ChangeNotifier {
     );
   }
 
+  /// Cambia el idioma de la interfaz.
+  ///
+  /// No reinicia nada: los textos se leen del idioma activo en cada repintado, y
+  /// `notifyListeners` desde `_commit` provoca ese repintado. Los mensajes que ya
+  /// estaban en la consola se quedan en el idioma en que se escribieron, que es
+  /// lo honesto: son un historial de lo que pasó, no una traducción en vivo.
+  void setUiLanguage(UiLanguage language) {
+    final AppStrings applied = L10n.apply(language);
+    _commit(_settings.copyWith(uiLanguage: language));
+    final String name = switch (language) {
+      UiLanguage.auto => '${t.uiLanguageAuto} (${applied.localeCode})',
+      UiLanguage.spanish => t.uiLanguageSpanish,
+      UiLanguage.english => t.uiLanguageEnglish,
+    };
+    toasts.info(t.uiLanguageChanged(name));
+  }
+
   void setTransparencyMode(TransparencyMode mode) {
     _commit(_settings.copyWith(transparency: mode));
     _applyTransparencyMode();
@@ -902,6 +923,12 @@ class AppController extends ChangeNotifier {
     _applyTransparencyMode();
   }
 
+  /// Vacía el historial de subtítulos de la caja.
+  void clearSubtitleHistory() {
+    _pipeline?.clearHistory();
+    toasts.info('Historial de subtítulos vaciado');
+  }
+
   void setStartInConfigMode(bool value) =>
       _commit(_settings.copyWith(startInConfigMode: value));
 
@@ -910,6 +937,82 @@ class AppController extends ChangeNotifier {
   Future<void> refreshWindowList() async {
     _availableWindows = listTopLevelWindows();
     notifyListeners();
+  }
+
+  /// Encuentra la ventana del juego y engancha la zona a ella.
+  ///
+  /// Es el camino directo: en lugar de dibujar un rectángulo a mano sobre la
+  /// pantalla, se elige la ventana y la zona se coloca sola en su parte baja, que
+  /// es donde ponen el diálogo casi todos los juegos. Y como queda anclada a la
+  /// ventana, mover el juego no obliga a recolocar nada.
+  ///
+  /// Se prueban dos vías en orden. Primero la ventana en primer plano: si el
+  /// usuario acaba de estar en el juego, es esa, y ninguna heurística lo va a
+  /// hacer mejor. Si no sirve (el foco lo tiene el panel de Traducy, o el
+  /// escritorio), se elige entre las visibles la de mayor superficie que no sea
+  /// una ventana del sistema.
+  Future<bool> detectGameWindow() async {
+    _availableWindows = listTopLevelWindows();
+
+    ForeignWindow? candidate = foregroundWindow();
+    if (candidate != null && _looksLikeSystemWindow(candidate.title)) {
+      candidate = null;
+    }
+
+    candidate ??= _largestUsableWindow(_availableWindows);
+
+    if (candidate == null) {
+      notifyListeners();
+      toasts.warning(
+        'No se encontró ninguna ventana de juego',
+        detail:
+            'Abre el juego en modo ventana o sin bordes y vuelve a pulsar '
+            'Detectar el juego.',
+      );
+      return false;
+    }
+
+    followWindow(candidate);
+    return true;
+  }
+
+  /// Descarta lo que nunca es el juego: el escritorio, la barra de tareas y los
+  /// componentes de la interfaz de Windows, que aparecen en la enumeración como
+  /// ventanas normales y a pantalla completa.
+  static bool _looksLikeSystemWindow(String title) {
+    const List<String> known = <String>[
+      'program manager',
+      'windows input experience',
+      'windows shell experience host',
+      '搜索',
+      'search',
+      'configuración',
+      'settings',
+      'traducy',
+      'nvidia geforce overlay',
+      'explorador de archivos',
+      'file explorer',
+    ];
+    final String lower = title.toLowerCase().trim();
+    if (lower.isEmpty) return true;
+    return known.any((String name) => lower == name || lower.startsWith(name));
+  }
+
+  ForeignWindow? _largestUsableWindow(List<ForeignWindow> windows) {
+    ForeignWindow? best;
+    int bestArea = 0;
+    for (final ForeignWindow window in windows) {
+      if (_looksLikeSystemWindow(window.title)) continue;
+      // Una ventana de juego ocupa una parte apreciable de la pantalla. El
+      // umbral descarta paletas, notificaciones y ventanas de utilidades.
+      if (window.width < 320 || window.height < 240) continue;
+      final int area = window.width * window.height;
+      if (area > bestArea) {
+        bestArea = area;
+        best = window;
+      }
+    }
+    return best;
   }
 
   /// Ancla la región a una ventana concreta y ajusta la zona a su parte
@@ -935,7 +1038,9 @@ class AppController extends ChangeNotifier {
     );
     toasts.success(
       'Siguiendo a "${window.title}"',
-      detail: 'La zona se moverá con esa ventana. Ajústala si hace falta.',
+      detail:
+          'La zona está en la parte baja de esa ventana y se mueve con ella. '
+          'Actívala en Zona si quieres ajustarla.',
     );
   }
 
