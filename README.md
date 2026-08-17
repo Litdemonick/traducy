@@ -7,6 +7,8 @@ subtítulos por encima, sin tocar el juego ni sus ficheros.
 Pensado para jugar a juegos en japonés, chino, coreano, inglés o cualquier otro
 idioma sin traducción oficial.
 
+**[Descargar la última versión](https://github.com/Litdemonick/traducy/releases/latest)**
+
 ## Cómo funciona
 
 ```
@@ -278,6 +280,39 @@ un sufijo de letras no lo es, así que conviven dos formas de lo mismo —
 segunda a partir de la primera (letras a número, como las columnas de una hoja de
 cálculo), de modo que el orden de versiones se conserva y el instalador puede
 comparar cuál es más reciente.
+
+## Actualizaciones automáticas
+
+Traducy consulta las releases de este repositorio al arrancar. Cuando hay una
+versión nueva:
+
+1. **Detiene la traducción y bloquea la aplicación.** Es a propósito: una versión
+   vieja funcionando contra una API que ya cambió da resultados raros que parecen
+   fallos de la propia aplicación.
+2. Pulsando **Actualizar ahora** descarga el instalador mostrando el progreso.
+3. Vuelca los ajustes a disco, lanza el instalador y se cierra. El instalador
+   sustituye la versión anterior en la misma carpeta y vuelve a abrir Traducy.
+
+La pantalla de bloqueo **siempre ofrece salir**, y si la descarga falla ofrece
+reintentar y enseña la dirección para bajarla a mano: un fallo de red no debe
+dejar a nadie encerrado sin poder cerrar el programa.
+
+No hay ningún token dentro del ejecutable. El repositorio es público justo para
+eso: una credencial incrustada en un `.exe` que se reparte es una credencial
+regalada a quien lo tenga.
+
+### Publicar una versión nueva
+
+```powershell
+python tools\set_version.py 1.0.0.c
+flutter build windows --release
+iscc installer	raducy.iss
+gh release create v1.0.0.c installer\salida\TraducySetup-1.0.0.c.exe --title "Traducy 1.0.0.c" --notes "..."
+```
+
+La etiqueta debe ser `v` más la versión, y el adjunto tiene que ser un `.exe` con
+`Setup` en el nombre: es lo que busca el actualizador entre los ficheros de la
+release.
 
 ## Estructura del código
 
