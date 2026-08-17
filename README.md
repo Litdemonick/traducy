@@ -140,6 +140,9 @@ el de los subtítulos — deja pasar los clics al programa de debajo.
   solos encima del juego.
 - Las cajas se mueven arrastrando su **barra de título** y se redimensionan por
   los **tiradores del borde**, como una ventana normal.
+- El **panel de control** se mueve por su cabecera y se redimensiona por
+  cualquiera de sus cuatro lados o cuatro esquinas. Doble clic en un borde
+  devuelve el tamaño de fábrica.
 - Si algo no responde como esperas, desactiva *Poder jugar con el panel abierto*
   en Zona: la ventana pasa a capturar todos los clics mientras el panel esté
   visible, que es el comportamiento simple y predecible.
@@ -271,14 +274,6 @@ Lo mismo: pantalla completa exclusiva. GDI no puede leer de ahí.
 Ocurre solo en Windows anteriores a la versión 2004, donde el overlay no puede
 excluirse de la captura. Mueve la caja de subtítulos fuera del rectángulo verde;
 el panel avisa cuando se solapan.
-</details>
-
-<details>
-<summary><b>El fondo del overlay es opaco</b></summary>
-
-Cambia **Zona → Transparencia** al modo *Compatible*, que recorta un color en
-lugar de usar transparencia real. Funciona en cualquier equipo, a cambio de
-perder los bordes suaves y los fondos translúcidos del subtítulo.
 </details>
 
 <details>

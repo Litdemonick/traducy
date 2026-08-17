@@ -67,20 +67,99 @@ class _ControlPanelState extends State<ControlPanel>
       child: Stack(
         children: <Widget>[
           Positioned.fill(child: _panel(context)),
-          // Asa de redimensión en la esquina inferior derecha, dentro de los
-          // límites del panel: un widget pintado fuera de su padre no recibe
-          // clics en Flutter.
+
+          // Tiradores de los cuatro lados y las cuatro esquinas, todos dentro de
+          // los límites del panel: un widget pintado fuera de su padre no recibe
+          // clics en Flutter, así que un tirador "por fuera" del borde no
+          // funcionaría.
+          //
+          // Van después del panel en el Stack para quedar por encima de su
+          // contenido; si no, los controles del borde se comerían el arrastre.
+          _edge(top: true),
+          _edge(bottom: true),
+          _edge(left: true),
+          _edge(right: true),
+          _edge(top: true, left: true),
+          _edge(top: true, right: true),
+          _edge(bottom: true, left: true),
+          _edge(bottom: true, right: true),
+
+          // La esquina inferior derecha lleva además su marca visible, que es lo
+          // que hace evidente que el panel se puede redimensionar.
           Positioned(
             right: 0,
             bottom: 0,
             child: _ResizeGrip(
-              onDelta: (Offset delta) => c.setPanelSize(
-                Size(size.width + delta.dx, size.height + delta.dy),
+              onDelta: (Offset delta) => c.resizePanelFromEdge(
+                delta: delta,
+                left: false,
+                top: false,
+                right: true,
+                bottom: true,
               ),
               onReset: c.resetPanelSize,
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// Grosor de la banda sensible de cada borde.
+  ///
+  /// 7 px es suficiente para acertar con el ratón sin pensar y poco para robarle
+  /// clics al contenido que hay justo dentro.
+  static const double _edgeBand = 7;
+
+  /// Zona de arrastre de un borde o de una esquina.
+  ///
+  /// Se indica con banderas en lugar de con un enum de nueve valores porque es lo
+  /// que consume `resizePanelFromEdge`: qué bordes se mueven. Una esquina es
+  /// simplemente dos bordes a la vez.
+  Widget _edge({
+    bool left = false,
+    bool top = false,
+    bool right = false,
+    bool bottom = false,
+  }) {
+    final bool horizontal = left || right;
+    final bool vertical = top || bottom;
+    final bool corner = horizontal && vertical;
+
+    final MouseCursor cursor = corner
+        ? ((left && top) || (right && bottom)
+              ? SystemMouseCursors.resizeUpLeftDownRight
+              : SystemMouseCursors.resizeUpRightDownLeft)
+        : (horizontal
+              ? SystemMouseCursors.resizeLeftRight
+              : SystemMouseCursors.resizeUpDown);
+
+    // En las esquinas la zona sensible es un cuadrado algo mayor: acertar en la
+    // intersección de dos bandas de 7 px sería un ejercicio de puntería.
+    final double thickness = corner ? _edgeBand * 2.4 : _edgeBand;
+
+    return Positioned(
+      left: left || !horizontal ? 0 : null,
+      right: right || !horizontal ? 0 : null,
+      top: top || !vertical ? 0 : null,
+      bottom: bottom || !vertical ? 0 : null,
+      width: horizontal ? thickness : null,
+      height: vertical ? thickness : null,
+      child: MouseRegion(
+        cursor: cursor,
+        child: GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          onPanUpdate: (DragUpdateDetails details) => c.resizePanelFromEdge(
+            delta: details.delta,
+            left: left,
+            top: top,
+            right: right,
+            bottom: bottom,
+          ),
+          // Doble clic en cualquier borde devuelve el tamaño de fábrica: es la
+          // salida cuando el panel queda demasiado pequeño o demasiado grande.
+          onDoubleTap: c.resetPanelSize,
+        ),
       ),
     );
   }
@@ -430,9 +509,13 @@ class _SetupGuide extends StatelessWidget {
   }
 
   List<_Step> _buildSteps(AppController c) {
-    final bool tesseractMissing =
+    final bool usingWindows = c.settings.engines.ocrKind == OcrKind.windows;
+    final bool engineMissing =
         c.ocrHealth.hasProblem && c.missingOcrLanguages.isEmpty;
-    final bool languageMissing = c.missingOcrLanguages.isNotEmpty;
+    // Descargar paquetes es cosa de Tesseract. Con el motor de Windows este paso
+    // no existe, y dejarlo decia "falta el idioma" sobre algo que no se usa.
+    final bool languageMissing =
+        !usingWindows && c.missingOcrLanguages.isNotEmpty;
     final bool regionReady = c.resolveCaptureRegion().isValid;
     final bool running = c.pipeline?.isRunning ?? false;
     final String missingFirst = c.missingOcrLanguages.isEmpty
@@ -440,42 +523,64 @@ class _SetupGuide extends StatelessWidget {
         : c.missingOcrLanguages.first;
 
     return <_Step>[
-      _Step(
-        title: 'Instalar Tesseract, el motor que lee el texto',
-        done: !tesseractMissing,
-        problem:
-            'Falta Tesseract: sin el no se puede leer el texto de la pantalla.',
-        hint:
-            'Es el unico programa externo que necesita Traducy. Pulsa el boton '
-            'y acepta la instalacion en la ventana que se abre.',
-        action: _ActionButton(
-          label: 'Instalar Tesseract',
-          icon: Icons.download,
-          onPressed: c.installTesseract,
-          secondaryLabel: 'Ya esta, comprobar',
-          onSecondary: c.refreshEngineHealth,
+      if (usingWindows)
+        _Step(
+          title: 'Motor de OCR: el que trae Windows',
+          done: !engineMissing,
+          problem:
+              c.ocrHealth.issue ??
+              'El OCR de Windows no puede leer este idioma.',
+          hint:
+              'No hay nada que instalar ni nada que cambiar en tu Windows. Si el '
+              'idioma del juego no esta entre los que reconoce el sistema, pasa a '
+              'Tesseract: sus paquetes se guardan dentro de la carpeta de '
+              'Traducy.',
+          action: _ActionButton(
+            label: 'Usar Tesseract',
+            icon: Icons.swap_horiz,
+            onPressed: () => c.setOcrKind(OcrKind.tesseract),
+            secondaryLabel: 'Volver a comprobar',
+            onSecondary: c.refreshEngineHealth,
+          ),
+        )
+      else
+        _Step(
+          title: 'Instalar Tesseract, el motor que lee el texto',
+          done: !engineMissing,
+          problem: 'Falta Tesseract: sin el no se puede leer el texto de la pantalla.',
+          hint:
+              'Pulsa el boton y acepta la instalacion en la ventana que se abre. '
+              'O cambia al OCR de Windows, que ya viene con el sistema y no hay '
+              'que instalar.',
+          action: _ActionButton(
+            label: 'Instalar Tesseract',
+            icon: Icons.download,
+            onPressed: c.installTesseract,
+            secondaryLabel: 'Usar el de Windows',
+            onSecondary: () => c.setOcrKind(OcrKind.windows),
+          ),
         ),
-      ),
-      _Step(
-        title: 'Descargar el idioma del juego',
-        done: !languageMissing,
-        problem: 'Falta el idioma "$missingFirst" del OCR.',
-        hint:
-            'Tesseract necesita un paquete por cada escritura que lee. Se '
-            'descarga en la carpeta de Traducy, sin pedir permisos de '
-            'administrador.',
-        action: c.download != null
-            ? _DownloadProgressBar(progress: c.download!)
-            : _ActionButton(
-                label: 'Descargar $missingFirst',
-                icon: Icons.language,
-                onPressed: () {
-                  if (missingFirst.isNotEmpty) {
-                    c.installOcrLanguage(missingFirst);
-                  }
-                },
-              ),
-      ),
+      if (!usingWindows)
+        _Step(
+          title: 'Descargar el idioma del juego',
+          done: !languageMissing,
+          problem: 'Falta el idioma "$missingFirst" del OCR.',
+          hint:
+              'Tesseract necesita un paquete por cada escritura que lee. Se '
+              'descarga en la carpeta de Traducy, sin pedir permisos de '
+              'administrador.',
+          action: c.download != null
+              ? _DownloadProgressBar(progress: c.download!)
+              : _ActionButton(
+                  label: 'Descargar $missingFirst',
+                  icon: Icons.language,
+                  onPressed: () {
+                    if (missingFirst.isNotEmpty) {
+                      c.installOcrLanguage(missingFirst);
+                    }
+                  },
+                ),
+        ),
       _Step(
         title: 'Marcar la zona donde aparece el texto',
         done: regionReady,
@@ -934,34 +1039,6 @@ class _RegionTab extends StatelessWidget {
               'panel o las cajas. Desactívalo si algún clic no responde bien.',
           value: controller.settings.passthroughInConfig,
           onChanged: controller.setPassthroughInConfig,
-        ),
-        const SectionTitle('Transparencia'),
-        const HelpText(
-          'Compositor da transparencia real y es lo normal. El modo compatible '
-          'recorta un color en vez de usar transparencia real: úsalo solo si con '
-          'Compositor ves un fondo opaco tapando el escritorio. Los bordes '
-          'suaves y los fondos translúcidos del subtítulo pierden calidad.',
-        ),
-        SegmentedButton<TransparencyMode>(
-          segments: const <ButtonSegment<TransparencyMode>>[
-            ButtonSegment<TransparencyMode>(
-              value: TransparencyMode.compositor,
-              label: Text('Compositor'),
-            ),
-            ButtonSegment<TransparencyMode>(
-              value: TransparencyMode.colorKey,
-              label: Text('Compatible'),
-            ),
-          ],
-          selected: <TransparencyMode>{controller.settings.transparency},
-          onSelectionChanged: (Set<TransparencyMode> value) =>
-              controller.setTransparencyMode(value.first),
-          style: ButtonStyle(
-            textStyle: const WidgetStatePropertyAll<TextStyle>(
-              TextStyle(fontSize: 11.5),
-            ),
-            visualDensity: VisualDensity.compact,
-          ),
         ),
       ],
     );
@@ -1739,7 +1816,12 @@ class _DiagnosticsTab extends StatelessWidget {
             ),
           ],
         ),
-        _healthCard('OCR (Tesseract)', ocr),
+        _healthCard(
+          controller.settings.engines.ocrKind == OcrKind.windows
+              ? 'OCR (Windows)'
+              : 'OCR (Tesseract)',
+          ocr,
+        ),
         _healthCard('Traductor', translator),
 
         if (controller.installedOcrLanguages.isNotEmpty) ...<Widget>[

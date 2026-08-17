@@ -2,16 +2,6 @@ import 'dart:ui' show Color, Offset, Rect, Size;
 
 import '../i18n/strings.dart';
 
-/// Modo de transparencia de la ventana overlay.
-enum TransparencyMode {
-  /// Alfa real vía composición DWM. Es lo que se ve mejor.
-  compositor,
-
-  /// Un color concreto se vuelve invisible. Funciona en cualquier Windows,
-  /// como red de seguridad si el compositor no da transparencia.
-  colorKey,
-}
-
 enum TranslatorKind { none, googleFree, libre, deepl, claude }
 
 /// Motor que lee el texto de la imagen.
@@ -634,10 +624,8 @@ class AppSettings {
     this.preprocess = const PreprocessSettings(),
     this.pipeline = const PipelineSettings(),
     this.engines = const EngineSettings(),
-    this.transparency = TransparencyMode.compositor,
     this.uiLanguage = UiLanguage.auto,
     this.autoUpdate = true,
-    this.colorKey = 0xFF00FF,
     this.startInConfigMode = true,
     this.passthroughInConfig = true,
     this.hotkeyToggleConfig = 'ctrl+alt+T',
@@ -696,7 +684,6 @@ class AppSettings {
   final PreprocessSettings preprocess;
   final PipelineSettings pipeline;
   final EngineSettings engines;
-  final TransparencyMode transparency;
 
   /// Idioma en el que se ve la aplicación. Distinto del idioma al que se
   /// traduce: ese vive en [EngineSettings.targetLanguage].
@@ -708,7 +695,6 @@ class AppSettings {
   /// nueva, así que sin esto el bloqueo se queda esperando un clic: prefiero que
   /// la actualización siga sola y que quien no la quiera la desactive.
   final bool autoUpdate;
-  final int colorKey;
   final bool startInConfigMode;
 
   /// En modo configuración, dejar pasar los clics al juego mientras el cursor no
@@ -740,10 +726,8 @@ class AppSettings {
     PreprocessSettings? preprocess,
     PipelineSettings? pipeline,
     EngineSettings? engines,
-    TransparencyMode? transparency,
     UiLanguage? uiLanguage,
     bool? autoUpdate,
-    int? colorKey,
     bool? startInConfigMode,
     bool? passthroughInConfig,
     String? hotkeyToggleConfig,
@@ -766,10 +750,8 @@ class AppSettings {
     preprocess: preprocess ?? this.preprocess,
     pipeline: pipeline ?? this.pipeline,
     engines: engines ?? this.engines,
-    transparency: transparency ?? this.transparency,
     uiLanguage: uiLanguage ?? this.uiLanguage,
     autoUpdate: autoUpdate ?? this.autoUpdate,
-    colorKey: colorKey ?? this.colorKey,
     startInConfigMode: startInConfigMode ?? this.startInConfigMode,
     passthroughInConfig: passthroughInConfig ?? this.passthroughInConfig,
     hotkeyToggleConfig: hotkeyToggleConfig ?? this.hotkeyToggleConfig,
@@ -795,10 +777,8 @@ class AppSettings {
     'preprocess': preprocess.toJson(),
     'pipeline': pipeline.toJson(),
     'engines': engines.toJson(),
-    'transparency': transparency.name,
     'uiLanguage': uiLanguage.name,
     'autoUpdate': autoUpdate,
-    'colorKey': colorKey,
     'startInConfigMode': startInConfigMode,
     'passthroughInConfig': passthroughInConfig,
     'hotkeyToggleConfig': hotkeyToggleConfig,
@@ -836,14 +816,8 @@ class AppSettings {
     preprocess: PreprocessSettings.fromJson(_asMap(json['preprocess'])),
     pipeline: PipelineSettings.fromJson(_asMap(json['pipeline'])),
     engines: EngineSettings.fromJson(_asMap(json['engines'])),
-    transparency: _asEnum(
-      json['transparency'],
-      TransparencyMode.values,
-      TransparencyMode.compositor,
-    ),
     uiLanguage: _asEnum(json['uiLanguage'], UiLanguage.values, UiLanguage.auto),
     autoUpdate: _asBool(json['autoUpdate'], true),
-    colorKey: _asInt(json['colorKey'], 0xFF00FF),
     startInConfigMode: _asBool(json['startInConfigMode'], true),
     passthroughInConfig: _asBool(json['passthroughInConfig'], true),
     hotkeyToggleConfig: _asString(json['hotkeyToggleConfig'], 'ctrl+alt+T'),

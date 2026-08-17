@@ -210,35 +210,6 @@ class OverlayNative {
       w.swpNoMove | w.swpNoSize | w.swpNoActivate,
     );
   }
-
-  /// Transparencia por color clave: todo píxel del color indicado se vuelve
-  /// invisible. Es el modo compatible para equipos donde la composición DWM no
-  /// da transparencia real.
-  bool applyColorKey(int rgbColorKey) {
-    final int h = hwnd;
-    if (h == 0) return false;
-    applyOverlayStyles();
-    // Windows espera COLORREF = 0x00BBGGRR, al contrario que el 0xRRGGBB de Dart.
-    final int r = (rgbColorKey >> 16) & 0xFF;
-    final int g = (rgbColorKey >> 8) & 0xFF;
-    final int b = rgbColorKey & 0xFF;
-    final int colorRef = (b << 16) | (g << 8) | r;
-    final int ok = w.setLayeredWindowAttributes(
-      h,
-      colorRef,
-      255,
-      w.lwaColorKey,
-    );
-    if (ok == 0) log.w('overlay', 'SetLayeredWindowAttributes falló');
-    return ok != 0;
-  }
-
-  /// Quita el color clave y vuelve a alfa completo (modo compositor).
-  void clearColorKey() {
-    final int h = hwnd;
-    if (h == 0) return;
-    w.setLayeredWindowAttributes(h, 0, 255, w.lwaAlpha);
-  }
 }
 
 /// Posición del cursor en píxeles físicos de pantalla, o `null` si Windows no

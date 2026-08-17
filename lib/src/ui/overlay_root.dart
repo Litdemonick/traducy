@@ -173,21 +173,6 @@ class _OverlayRootState extends State<OverlayRoot> {
             return Stack(
               clipBehavior: Clip.none,
               children: <Widget>[
-                // Fondo del modo compatible.
-                //
-                // `LWA_COLORKEY` desactiva el alfa por píxel de la ventana: los
-                // píxeles que Flutter pinta transparentes dejan de serlo y salen
-                // opacos con el color que hubiera en el búfer, que es lo que se
-                // veía como una pantalla gris tapando el escritorio. En este
-                // modo hay que pintar de verdad el color clave para que Windows
-                // sepa qué recortar; en modo compositor el fondo se queda
-                // transparente y lo compone el DWM.
-                if (settings.transparency == TransparencyMode.colorKey)
-                  Positioned.fill(
-                    child: ColoredBox(
-                      color: Color(0xFF000000 | settings.colorKey),
-                    ),
-                  ),
                 if (settings.editRegion)
                   _RegionOverlay(controller: controller, bounds: logicalSize),
                 _SubtitleLayer(controller: controller, bounds: logicalSize),

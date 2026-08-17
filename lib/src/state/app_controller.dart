@@ -143,7 +143,6 @@ class AppController extends ChangeNotifier {
       _overlay.applyOverlayStyles();
       _overlay.excludeFromCapture(true);
       await _applyInteractionMode();
-      _applyTransparencyMode();
 
       _buildPipeline();
       _startKeepAliveTimers();
@@ -619,14 +618,6 @@ class AppController extends ChangeNotifier {
 
   void toggleSubtitlesVisible() => setSubtitlesVisible(!_subtitlesVisible);
 
-  void _applyTransparencyMode() {
-    if (_settings.transparency == TransparencyMode.colorKey) {
-      _overlay.applyColorKey(_settings.colorKey);
-    } else {
-      _overlay.clearColorKey();
-    }
-  }
-
   bool get isExcludedFromCapture => _overlay.isExcludedFromCapture;
 
   /// `true` si la caja de subtítulos se solapa con la zona de captura y el
@@ -771,6 +762,68 @@ class AppController extends ChangeNotifier {
     );
   }
 
+  /// Redimensiona el panel arrastrando cualquiera de sus bordes.
+  ///
+  /// Tirando del borde izquierdo o del superior hay que mover **tambien** el
+  /// origen: si solo cambiara el tamano, el panel creceria hacia el lado
+  /// contrario al del arrastre, que es exactamente lo que nadie espera.
+  ///
+  /// El limite se aplica al tamano antes de calcular la posicion, y no despues:
+  /// al reves, al llegar al minimo el borde seguia moviendose y el panel se
+  /// deslizaba por la pantalla en lugar de quedarse quieto.
+  void resizePanelFromEdge({
+    required Offset delta,
+    required bool left,
+    required bool top,
+    required bool right,
+    required bool bottom,
+  }) {
+    final Size current = panelSize;
+    final Size limits = _panelSizeLimits();
+
+    double width = current.width;
+    double height = current.height;
+    if (left) width -= delta.dx;
+    if (right) width += delta.dx;
+    if (top) height -= delta.dy;
+    if (bottom) height += delta.dy;
+
+    width = width.clamp(AppSettings.panelMinWidth, limits.width);
+    height = height.clamp(AppSettings.panelMinHeight, limits.height);
+
+    double x = _settings.panelX;
+    double y = _settings.panelY;
+    if (left) x += current.width - width;
+    if (top) y += current.height - height;
+
+    _commit(
+      _settings.copyWith(
+        panelWidth: width,
+        panelHeight: height,
+        panelX: x < 0 ? 0 : x,
+        panelY: y < 0 ? 0 : y,
+      ),
+    );
+  }
+
+  /// Tamano maximo del panel en la pantalla actual.
+  Size _panelSizeLimits() {
+    final Size bounds = _windowLogicalSize == Size.zero
+        ? const Size(1920, 1080)
+        : _windowLogicalSize;
+    const double margin = 32;
+    return Size(
+      (bounds.width - margin).clamp(
+        AppSettings.panelMinWidth,
+        AppSettings.panelMaxWidth,
+      ),
+      (bounds.height - margin).clamp(
+        AppSettings.panelMinHeight,
+        AppSettings.panelMaxHeight,
+      ),
+    );
+  }
+
   void setPanelSize(Size size) {
     _commit(
       _settings.copyWith(panelWidth: size.width, panelHeight: size.height),
@@ -909,24 +962,6 @@ class AppController extends ChangeNotifier {
       UiLanguage.english => t.uiLanguageEnglish,
     };
     toasts.info(t.uiLanguageChanged(name));
-  }
-
-  void setTransparencyMode(TransparencyMode mode) {
-    _commit(_settings.copyWith(transparency: mode));
-    _applyTransparencyMode();
-    toasts.info(
-      mode == TransparencyMode.compositor
-          ? 'Transparencia por compositor'
-          : 'Transparencia compatible por color',
-      detail: mode == TransparencyMode.compositor
-          ? 'Es la de mejor aspecto. Si ves fondo opaco, prueba la compatible.'
-          : 'Funciona en cualquier equipo, aunque el borde puede notarse.',
-    );
-  }
-
-  void setColorKey(int argb) {
-    _commit(_settings.copyWith(colorKey: argb & 0xFFFFFF));
-    _applyTransparencyMode();
   }
 
   /// Vacía el historial de subtítulos de la caja.
@@ -1087,11 +1122,7 @@ class AppController extends ChangeNotifier {
 
   OcrEngine _createOcrEngine() {
     if (_settings.engines.ocrKind == OcrKind.windows) {
-      return WindowsOcr(
-        languageTag: WindowsOcr.tagForTesseractCode(
-          _settings.engines.ocrLanguages,
-        ),
-      );
+      return WindowsOcr(languageTag: windowsOcrEffectiveTag);
     }
     return TesseractOcr(
       executablePath: _settings.engines.tesseractPath,
@@ -1113,10 +1144,30 @@ class AppController extends ChangeNotifier {
   bool get windowsOcrAvailable => _windowsOcrLanguages.isNotEmpty;
 
   /// `true` si el motor de Windows tiene el idioma que se ha pedido.
-  bool get windowsOcrCoversRequest => WindowsOcr.covers(
-    _windowsOcrLanguages,
-    WindowsOcr.tagForTesseractCode(_settings.engines.ocrLanguages),
-  );
+  bool get windowsOcrCoversRequest =>
+      WindowsOcr.covers(_windowsOcrLanguages, windowsOcrRequestedTag);
+
+  /// Etiqueta BCP-47 que corresponde al idioma del juego (`jpn` -> `ja`).
+  String get windowsOcrRequestedTag =>
+      WindowsOcr.tagForTesseractCode(_settings.engines.ocrLanguages);
+
+  /// Etiqueta concreta con la que se va a crear el motor.
+  ///
+  /// Se prefiere una de las que el sistema dice tener, incluida su variante
+  /// regional: pedir `ja` cuando lo instalado es `ja-JP` funciona casi siempre,
+  /// pero no en todas las versiones de Windows, y usar el nombre exacto que
+  /// devuelve el sistema evita depender de eso.
+  String get windowsOcrEffectiveTag {
+    final String wanted = windowsOcrRequestedTag.toLowerCase();
+    final String base = wanted.split('-').first;
+    for (final String tag in _windowsOcrLanguages) {
+      if (tag.toLowerCase() == wanted) return tag;
+    }
+    for (final String tag in _windowsOcrLanguages) {
+      if (tag.toLowerCase().split('-').first == base) return tag;
+    }
+    return windowsOcrRequestedTag;
+  }
 
   /// Cambia de motor de OCR y lo reinicia.
   Future<void> setOcrKind(OcrKind kind) async {
@@ -1125,15 +1176,23 @@ class AppController extends ChangeNotifier {
       _settings.copyWith(engines: _settings.engines.copyWith(ocrKind: kind)),
       rebuildEngines: true,
     );
+    if (kind == OcrKind.windows) {
+      _windowsOcrLanguages = await WindowsOcr.systemLanguages();
+    } else {
+      // Los idiomas del sistema no dicen nada sobre Tesseract, y dejarlos
+      // puestos haria que la interfaz mezclara los dos motores.
+      _installedOcrLanguages = const <String>[];
+      _missingOcrLanguages = const <String>[];
+    }
     await refreshEngineHealth();
-    toasts.info(
-      kind == OcrKind.windows
-          ? 'Motor de OCR: el de Windows'
-          : 'Motor de OCR: Tesseract',
-      detail: kind == OcrKind.windows
-          ? 'Gratis y sin instalar nada. Necesita el idioma en Windows.'
-          : 'Funciona en cualquier equipo con sus propios paquetes de idioma.',
-    );
+    if (kind == OcrKind.windows) {
+      await _autoDetectWindowsOcr();
+    } else {
+      // Se vuelve a mirar el equipo de verdad, no se da por hecho nada. Al
+      // cambiar de motor las listas se vacian, y sin volver a detectar la guia
+      // ofrecia descargar un idioma que el usuario ya tenia instalado.
+      await autoDetectSetup();
+    }
   }
 
   Translator _createTranslator() {
@@ -1509,7 +1568,18 @@ class AppController extends ChangeNotifier {
   /// una ruta no estándar, la fija; y si todo está en orden, también lo dice,
   /// para que no haya dudas.
   Future<void> autoDetectSetup() async {
-    final TesseractOcr probe = _createOcrEngine() as TesseractOcr;
+    if (_settings.engines.ocrKind == OcrKind.windows) {
+      await _autoDetectWindowsOcr();
+      return;
+    }
+    // El cast es seguro tras la comprobacion de arriba, pero se hace con `is`
+    // para que un motor nuevo en el futuro no acabe en una excepcion.
+    final OcrEngine engine = _createOcrEngine();
+    if (engine is! TesseractOcr) {
+      engine.dispose();
+      return;
+    }
+    final TesseractOcr probe = engine;
     try {
       final String? exe = await probe.resolveExecutable();
       if (exe == null) {
@@ -1588,6 +1658,40 @@ class AppController extends ChangeNotifier {
     );
   }
 
+  /// Comprueba el motor del sistema y cuenta lo que encuentra.
+  ///
+  /// No toca nada de Windows. Si el idioma del juego no esta entre los que el
+  /// sistema reconoce, la salida no es "instala un paquete de idioma": es pasar a
+  /// Tesseract, que guarda sus idiomas dentro de la carpeta de Traducy y no
+  /// cambia nada del equipo. Anadir el idioma a Windows queda como alternativa
+  /// para quien la quiera, no como requisito.
+  Future<void> _autoDetectWindowsOcr() async {
+    _windowsOcrLanguages = await WindowsOcr.systemLanguages();
+    notifyListeners();
+
+    if (_windowsOcrLanguages.isEmpty) {
+      toasts.warning(
+        'Este Windows no trae el componente de OCR',
+        detail: 'Cambia a Tesseract en la pestana Idiomas.',
+      );
+      return;
+    }
+    if (!windowsOcrCoversRequest) {
+      toasts.warning(
+        'Windows no reconoce "${_settings.engines.ocrLanguages}"',
+        detail:
+            'Reconoce: ${_windowsOcrLanguages.join(', ')}. Usa Tesseract para '
+            'este idioma: se descarga dentro de Traducy y no cambia nada de tu '
+            'Windows.',
+      );
+      return;
+    }
+    toasts.success(
+      'OCR de Windows listo ($windowsOcrEffectiveTag)',
+      detail: 'Sin instalar nada y sin salir del equipo.',
+    );
+  }
+
   Future<void> refreshEngineHealth() async {
     _ocrHealth = const EngineHealth(checking: true);
     _translatorHealth = const EngineHealth(checking: true);
@@ -1599,6 +1703,10 @@ class AppController extends ChangeNotifier {
       _ocrHealth = EngineHealth(issue: issue, checkedAt: DateTime.now());
       if (ocr is WindowsOcr) {
         _windowsOcrLanguages = await WindowsOcr.systemLanguages();
+        // Los paquetes de Tesseract no cuentan con este motor: si se dejaran, la
+        // guia seguiria pidiendo descargar idiomas que no hacen falta.
+        _installedOcrLanguages = const <String>[];
+        _missingOcrLanguages = const <String>[];
       }
       if (ocr is TesseractOcr) {
         // Sistema + descargados: si solo se contase el sistema, un idioma
