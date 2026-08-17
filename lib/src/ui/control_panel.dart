@@ -6,6 +6,7 @@ import 'toasts.dart';
 import '../core/logx.dart';
 import '../core/version.dart';
 import '../models/languages.dart';
+import '../i18n/strings.dart';
 import '../models/settings.dart';
 import '../pipeline/pipeline.dart';
 import '../ocr/tessdata_installer.dart';
@@ -196,13 +197,13 @@ class _ControlPanelState extends State<ControlPanel>
               fontWeight: FontWeight.w600,
             ),
             dividerColor: const Color(0xFF3A3A44),
-            tabs: const <Tab>[
-              Tab(text: 'Zona'),
-              Tab(text: 'Idiomas'),
-              Tab(text: 'Estilo'),
-              Tab(text: 'Rendimiento'),
-              Tab(text: 'Diagnóstico'),
-              Tab(text: 'Acerca de'),
+            tabs: <Tab>[
+              Tab(text: t.tabRegion),
+              Tab(text: t.tabLanguages),
+              Tab(text: t.tabStyle),
+              Tab(text: t.tabPerformance),
+              Tab(text: t.tabDiagnostics),
+              Tab(text: t.tabAbout),
             ],
           ),
           // Expanded en lugar de una altura fija: así el contenido crece y se
@@ -272,9 +273,7 @@ class _ResizeGrip extends StatelessWidget {
         onPanUpdate: (DragUpdateDetails details) => onDelta(details.delta),
         onDoubleTap: onReset,
         child: Tooltip(
-          message:
-              'Arrastra para redimensionar · doble clic para el tamaño '
-              'por defecto',
+          message: t.panel.resizeHint,
           child: SizedBox(
             width: 22,
             height: 22,
@@ -353,23 +352,19 @@ class _Header extends StatelessWidget {
                   ),
                   const Expanded(child: SizedBox.shrink()),
                   IconButton(
-                    tooltip:
-                        'Minimizar. Su botón sigue en la barra de tareas: '
-                        'púlsalo para volver',
+                    tooltip: t.minimizeTooltip,
                     icon: const Icon(Icons.remove, size: 18),
                     color: kMuted,
                     onPressed: () => controller.minimizeOverlay(),
                   ),
                   IconButton(
-                    tooltip:
-                        'Modo juego: oculta Traducy y lo deja en segundo plano. '
-                        'Vuelve con su icono junto al reloj o con Ctrl+Alt+T',
+                    tooltip: t.gameModeTooltip,
                     icon: const Icon(Icons.visibility_off, size: 18),
                     color: kMuted,
                     onPressed: () => controller.sendToBackground(),
                   ),
                   IconButton(
-                    tooltip: 'Salir de Traducy',
+                    tooltip: t.exitTooltip,
                     icon: const Icon(Icons.power_settings_new, size: 18),
                     color: kDanger,
                     onPressed: onExit,
@@ -392,8 +387,8 @@ class _Header extends StatelessWidget {
                           ? Icons.pause
                           : Icons.play_arrow,
                       label: status.state == PipelineState.running
-                          ? 'Pausar'
-                          : 'Traducir',
+                          ? t.panel.pause
+                          : t.panel.translate,
                       color: status.state == PipelineState.running
                           ? kSubtitleAccent
                           : kRegionAccent,
@@ -455,9 +450,9 @@ class _SetupGuide extends StatelessWidget {
               severity: NoticeSeverity.error,
               action: TextButton(
                 onPressed: controller.clearDownloadError,
-                child: const Text(
-                  'Entendido',
-                  style: TextStyle(fontSize: 11.5),
+                child: Text(
+                  t.panel.understood,
+                  style: const TextStyle(fontSize: 11.5),
                 ),
               ),
             ),
@@ -486,7 +481,7 @@ class _SetupGuide extends StatelessWidget {
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            '${i + 1}. ${steps[i].title}',
+                            t.panel.stepNumber(i + 1, steps[i].title),
                             style: TextStyle(
                               fontSize: 11.5,
                               color: steps[i].done
@@ -526,54 +521,42 @@ class _SetupGuide extends StatelessWidget {
     return <_Step>[
       if (usingWindows)
         _Step(
-          title: 'Motor de OCR: el que trae Windows',
+          title: t.panel.stepWindowsOcrTitle,
           done: !engineMissing,
-          problem:
-              c.ocrHealth.issue ??
-              'El OCR de Windows no puede leer este idioma.',
-          hint:
-              'No hay nada que instalar ni nada que cambiar en tu Windows. Si el '
-              'idioma del juego no esta entre los que reconoce el sistema, pasa a '
-              'Tesseract: sus paquetes se guardan dentro de la carpeta de '
-              'Traducy.',
+          problem: c.ocrHealth.issue ?? t.panel.stepWindowsOcrProblem,
+          hint: t.panel.stepWindowsOcrHint,
           action: _ActionButton(
-            label: 'Usar Tesseract',
+            label: t.panel.useTesseract,
             icon: Icons.swap_horiz,
             onPressed: () => c.setOcrKind(OcrKind.tesseract),
-            secondaryLabel: 'Volver a comprobar',
+            secondaryLabel: t.panel.checkAgain,
             onSecondary: c.refreshEngineHealth,
           ),
         )
       else
         _Step(
-          title: 'Instalar Tesseract, el motor que lee el texto',
+          title: t.panel.stepTesseractTitle,
           done: !engineMissing,
-          problem: 'Falta Tesseract: sin el no se puede leer el texto de la pantalla.',
-          hint:
-              'Pulsa el boton y acepta la instalacion en la ventana que se abre. '
-              'O cambia al OCR de Windows, que ya viene con el sistema y no hay '
-              'que instalar.',
+          problem: t.panel.stepTesseractProblem,
+          hint: t.panel.stepTesseractHint,
           action: _ActionButton(
-            label: 'Instalar Tesseract',
+            label: t.panel.installTesseract,
             icon: Icons.download,
             onPressed: c.installTesseract,
-            secondaryLabel: 'Usar el de Windows',
+            secondaryLabel: t.panel.useWindowsOcr,
             onSecondary: () => c.setOcrKind(OcrKind.windows),
           ),
         ),
       if (!usingWindows)
         _Step(
-          title: 'Descargar el idioma del juego',
+          title: t.panel.stepLanguageTitle,
           done: !languageMissing,
-          problem: 'Falta el idioma "$missingFirst" del OCR.',
-          hint:
-              'Tesseract necesita un paquete por cada escritura que lee. Se '
-              'descarga en la carpeta de Traducy, sin pedir permisos de '
-              'administrador.',
+          problem: t.panel.stepLanguageProblem(missingFirst),
+          hint: t.panel.stepLanguageHint,
           action: c.download != null
               ? _DownloadProgressBar(progress: c.download!)
               : _ActionButton(
-                  label: 'Descargar $missingFirst',
+                  label: t.panel.downloadLanguage(missingFirst),
                   icon: Icons.language,
                   onPressed: () {
                     if (missingFirst.isNotEmpty) {
@@ -583,15 +566,12 @@ class _SetupGuide extends StatelessWidget {
                 ),
         ),
       _Step(
-        title: 'Marcar la zona donde aparece el texto',
+        title: t.panel.stepRegionTitle,
         done: regionReady,
-        problem: 'No hay una zona de captura valida todavia.',
-        hint:
-            'Pulsa el boton para colocar una banda en la parte baja de la '
-            'pantalla, y luego ajustala arrastrando el rectangulo verde sobre '
-            'el texto del juego.',
+        problem: t.panel.stepRegionProblem,
+        hint: t.panel.stepRegionHint,
         action: _ActionButton(
-          label: 'Usar la banda inferior',
+          label: t.panel.useBottomBand,
           icon: Icons.subtitles,
           onPressed: () {
             c.setRegionToBottomBand();
@@ -600,14 +580,12 @@ class _SetupGuide extends StatelessWidget {
         ),
       ),
       _Step(
-        title: 'Pulsar Traducir y pasar a modo juego con Ctrl+Alt+T',
+        title: t.panel.stepRunTitle,
         done: running,
-        problem: 'Todo listo, pero la traduccion esta parada.',
-        hint:
-            'Pulsa Traducir. Recuerda tener el juego en modo ventana: la '
-            'pantalla completa exclusiva no se puede capturar.',
+        problem: t.panel.stepRunProblem,
+        hint: t.panel.stepRunHint,
         action: _ActionButton(
-          label: 'Traducir ahora',
+          label: t.panel.translateNow,
           icon: Icons.play_arrow,
           onPressed: c.startTranslating,
         ),
@@ -714,7 +692,7 @@ class _DownloadProgressBar extends StatelessWidget {
         ),
         const SizedBox(height: 6),
         Text(
-          'Descargando ${progress.language}...  ${progress.readable}',
+          t.panel.downloadingLanguage(progress.language, progress.readable),
           style: const TextStyle(color: kMuted, fontSize: 11),
         ),
       ],
@@ -811,43 +789,32 @@ class _RegionTab extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         ZoneConsole(controller: controller, zone: PanelZone.region),
-        const SectionTitle('Activar sobre la pantalla'),
-        const HelpText(
-          'Los dos vienen desactivados a propósito: así nada aparece sobre el '
-          'juego sin que lo pidas. Actívalos para colocarlos, y desactívalos al '
-          'terminar. Se mueven por su barra de título y se redimensionan por los '
-          'tiradores del borde; el interior deja pasar los clics al juego.',
-        ),
+        SectionTitle(t.panel.activateSection),
+        HelpText(t.panel.activateHelp),
         _EditToggle(
-          label: 'Activar zona de captura',
-          description: 'Muestra el rectángulo verde para situarlo sobre el texto del juego.',
+          label: t.panel.activateRegionLabel,
+          description: t.panel.activateRegionDescription,
           color: kRegionAccent,
           value: s.editRegion,
           onChanged: controller.setEditRegion,
         ),
         _EditToggle(
-          label: 'Activar caja de subtítulos',
-          description:
-              'Muestra el marco naranja y un texto de ejemplo para colocarlo y '
-              'darle estilo. Apagado, no aparece nada hasta que hay traducción.',
+          label: t.panel.activateSubtitleLabel,
+          description: t.panel.activateSubtitleDescription,
           color: kSubtitleAccent,
           value: s.editSubtitleBox,
           onChanged: controller.setEditSubtitleBox,
         ),
 
-        const SectionTitle('Zona de captura'),
-        const HelpText(
-          'Lo más directo es detectar el juego: la zona se coloca sola en su '
-          'parte baja y se mueve con la ventana. Si prefieres situarla a mano, '
-          'usa los botones de abajo y ajusta el rectángulo verde.',
-        ),
+        SectionTitle(t.panel.captureZoneSection),
+        HelpText(t.panel.captureZoneHelp),
         SizedBox(
           width: double.infinity,
           child: PressableScale(
             child: FilledButton.icon(
               onPressed: () => controller.detectGameWindow(),
               icon: const Icon(Icons.videogame_asset, size: 16),
-              label: const Text('Detectar el juego'),
+              label: Text(t.panel.detectGame),
               style: FilledButton.styleFrom(
                 backgroundColor: kRegionAccent,
                 foregroundColor: const Color(0xFF11131A),
@@ -877,8 +844,8 @@ class _RegionTab extends StatelessWidget {
                 Expanded(
                   child: Text(
                     controller.followConnected
-                        ? 'Anclada a "${s.followWindowTitle}"'
-                        : 'Esperando "${s.followWindowTitle}" (no está abierta)',
+                        ? t.panel.anchoredTo(s.followWindowTitle)
+                        : t.panel.waitingFor(s.followWindowTitle),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
@@ -896,7 +863,7 @@ class _RegionTab extends StatelessWidget {
                     visualDensity: VisualDensity.compact,
                     textStyle: const TextStyle(fontSize: 11),
                   ),
-                  child: const Text('Desanclar'),
+                  child: Text(t.panel.unanchor),
                 ),
               ],
             ),
@@ -908,7 +875,7 @@ class _RegionTab extends StatelessWidget {
               child: OutlinedButton.icon(
                 onPressed: controller.setRegionToBottomBand,
                 icon: const Icon(Icons.subtitles, size: 15),
-                label: const Text('Banda inferior'),
+                label: Text(t.panel.bottomBand),
                 style: _outlined,
               ),
             ),
@@ -917,7 +884,7 @@ class _RegionTab extends StatelessWidget {
               child: OutlinedButton.icon(
                 onPressed: controller.setRegionToFullScreen,
                 icon: const Icon(Icons.fullscreen, size: 15),
-                label: const Text('Pantalla completa'),
+                label: Text(t.panel.fullScreen),
                 style: _outlined,
               ),
             ),
@@ -925,28 +892,28 @@ class _RegionTab extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         SwitchRow(
-          label: 'Zona bloqueada',
+          label: t.panel.regionLockedLabel,
           subtitle: s.regionLocked
-              ? 'No se puede mover ni redimensionar.'
-              : 'Se puede arrastrar y redimensionar.',
+              ? t.panel.regionLockedOn
+              : t.panel.regionLockedOff,
           value: s.regionLocked,
           onChanged: (bool v) => controller.setRegionLocked(v),
         ),
         SwitchRow(
-          label: 'Caja de subtítulos bloqueada',
-          subtitle: 'Candado independiente del de la zona.',
+          label: t.panel.subtitleLockedLabel,
+          subtitle: t.panel.subtitleLockedSubtitle,
           value: s.subtitleLocked,
           onChanged: (bool v) => controller.setSubtitleLocked(v),
         ),
         _LiveMetrics(
-          title: 'Zona de captura · píxeles reales de pantalla',
+          title: t.panel.metricsRegionTitle,
           accent: kRegionAccent,
           preview: controller.regionPreview,
           fallback: region,
           toRegion: controller.logicalRectToRegion,
         ),
         _LiveMetrics(
-          title: 'Caja de subtítulos · píxeles de la ventana',
+          title: t.panel.metricsSubtitleTitle,
           accent: kSubtitleAccent,
           preview: controller.subtitlePreview,
           fallback: CaptureRegion(
@@ -963,29 +930,26 @@ class _RegionTab extends StatelessWidget {
           ),
         ),
         if (!region.isValid)
-          const NoticeCard(
-            message: 'La zona es demasiado pequeña para leer texto.',
-            hint: 'Pulsa "Banda inferior" o agranda el rectángulo verde.',
+          NoticeCard(
+            message: t.panel.zoneTooSmall,
+            hint: t.panel.zoneTooSmallHint,
             severity: NoticeSeverity.warning,
           ),
 
-        const SectionTitle('Seguir una ventana'),
-        const HelpText(
-          'Ancla la zona a una ventana concreta: si mueves el juego, la zona lo '
-          'acompaña.',
-        ),
+        SectionTitle(t.panel.followWindowSection),
+        HelpText(t.panel.followWindowHelp),
         Row(
           children: <Widget>[
             Expanded(
               child: Text(
                 s.regionMode == RegionMode.followWindow
-                    ? 'Siguiendo: ${s.followWindowTitle}'
-                    : 'Zona fija en la pantalla',
+                    ? t.panel.followingWindow(s.followWindowTitle)
+                    : t.panel.fixedZone,
                 style: const TextStyle(color: Colors.white70, fontSize: 12),
               ),
             ),
             IconButton(
-              tooltip: 'Actualizar la lista de ventanas',
+              tooltip: t.panel.refreshWindowList,
               icon: const Icon(Icons.refresh, size: 18),
               color: kAccent,
               onPressed: controller.refreshWindowList,
@@ -996,16 +960,14 @@ class _RegionTab extends StatelessWidget {
           OutlinedButton.icon(
             onPressed: controller.stopFollowingWindow,
             icon: const Icon(Icons.link_off, size: 15),
-            label: const Text('Dejar de seguir'),
+            label: Text(t.panel.stopFollowing),
             style: _outlined,
           ),
         const SizedBox(height: 6),
         ConstrainedBox(
           constraints: const BoxConstraints(maxHeight: 160),
           child: controller.availableWindows.isEmpty
-              ? const HelpText(
-                  'Pulsa actualizar para listar las ventanas abiertas.',
-                )
+              ? HelpText(t.panel.pressRefreshToList)
               : ListView.builder(
                   shrinkWrap: true,
                   itemCount: controller.availableWindows.length,
@@ -1030,9 +992,9 @@ class _RegionTab extends StatelessWidget {
                       ),
                       trailing: TextButton(
                         onPressed: () => controller.followWindow(window),
-                        child: const Text(
-                          'Seguir',
-                          style: TextStyle(fontSize: 11.5),
+                        child: Text(
+                          t.panel.follow,
+                          style: const TextStyle(fontSize: 11.5),
                         ),
                       ),
                     );
@@ -1040,41 +1002,34 @@ class _RegionTab extends StatelessWidget {
                 ),
         ),
 
-        const SectionTitle('Ventana del overlay'),
+        SectionTitle(t.panel.overlayWindowSection),
         if (controller.isExcludedFromCapture)
-          const NoticeCard(
-            message: 'El overlay está excluido de la captura.',
-            hint:
-                'Los subtítulos no se releerán a sí mismos, así que puedes '
-                'colocarlos donde quieras.',
+          NoticeCard(
+            message: t.panel.overlayExcluded,
+            hint: t.panel.overlayExcludedHint,
             severity: NoticeSeverity.success,
           )
         else
-          const NoticeCard(
-            message:
-                'Este Windows no permite excluir el overlay de la captura.',
-            hint:
-                'Mantén la caja de subtítulos FUERA del rectángulo verde para '
-                'que el OCR no lea su propia traducción.',
+          NoticeCard(
+            message: t.panel.overlayNotExcluded,
+            hint: t.panel.overlayNotExcludedHint,
             severity: NoticeSeverity.warning,
           ),
         if (controller.subtitleOverlapsRegion)
-          const NoticeCard(
-            message: 'La caja de subtítulos se solapa con la zona de captura.',
-            hint: 'Muévela fuera del rectángulo verde para evitar un bucle.',
+          NoticeCard(
+            message: t.panel.subtitleOverlaps,
+            hint: t.panel.subtitleOverlapsHint,
             severity: NoticeSeverity.error,
           ),
         SwitchRow(
-          label: 'Abrir en modo configuración',
-          subtitle: 'Si se desactiva, Traducy arranca directo en modo juego.',
+          label: t.panel.startInConfigLabel,
+          subtitle: t.panel.startInConfigSubtitle,
           value: controller.settings.startInConfigMode,
           onChanged: controller.setStartInConfigMode,
         ),
         SwitchRow(
-          label: 'Poder jugar con el panel abierto',
-          subtitle:
-              'Los clics pasan al juego salvo cuando el cursor está sobre el '
-              'panel o las cajas. Desactívalo si algún clic no responde bien.',
+          label: t.panel.playWithPanelLabel,
+          subtitle: t.panel.playWithPanelSubtitle,
           value: controller.settings.passthroughInConfig,
           onChanged: controller.setPassthroughInConfig,
         ),
@@ -1225,10 +1180,16 @@ class _LiveMetrics extends StatelessWidget {
                   : toRegion(live);
               return Row(
                 children: <Widget>[
-                  _MetricChip(label: 'X', value: '${shown.left}'),
-                  _MetricChip(label: 'Y', value: '${shown.top}'),
-                  _MetricChip(label: 'Ancho', value: '${shown.width}'),
-                  _MetricChip(label: 'Alto', value: '${shown.height}'),
+                  _MetricChip(label: t.panel.metricX, value: '${shown.left}'),
+                  _MetricChip(label: t.panel.metricY, value: '${shown.top}'),
+                  _MetricChip(
+                    label: t.panel.metricWidth,
+                    value: '${shown.width}',
+                  ),
+                  _MetricChip(
+                    label: t.panel.metricHeight,
+                    value: '${shown.height}',
+                  ),
                 ],
               );
             },
@@ -1284,14 +1245,36 @@ class _LanguagesTab extends StatelessWidget {
       children: <Widget>[
         ZoneConsole(controller: controller, zone: PanelZone.languages),
 
-        const SectionTitle('Motor de OCR (lo que lee la pantalla)'),
-        const HelpText(
-          'El de Windows viene con el sistema: es gratis, no hay nada que '
-          'instalar, no sale nada del equipo y acierta más sobre capturas de '
-          'pantalla, sobre todo en japonés. Necesita que el idioma esté añadido '
-          'en Windows. Tesseract funciona en cualquier equipo y trae sus propios '
-          'paquetes, que Traducy descarga sin permisos de administrador.',
+        SectionTitle(t.uiLanguageSection),
+        HelpText(t.uiLanguageHelp),
+        SegmentedButton<UiLanguage>(
+          segments: <ButtonSegment<UiLanguage>>[
+            ButtonSegment<UiLanguage>(
+              value: UiLanguage.auto,
+              label: Text(t.uiLanguageAuto),
+            ),
+            ButtonSegment<UiLanguage>(
+              value: UiLanguage.spanish,
+              label: Text(t.uiLanguageSpanish),
+            ),
+            ButtonSegment<UiLanguage>(
+              value: UiLanguage.english,
+              label: Text(t.uiLanguageEnglish),
+            ),
+          ],
+          selected: <UiLanguage>{controller.settings.uiLanguage},
+          onSelectionChanged: (Set<UiLanguage> value) =>
+              controller.setUiLanguage(value.first),
+          style: ButtonStyle(
+            textStyle: const WidgetStatePropertyAll<TextStyle>(
+              TextStyle(fontSize: 11.5),
+            ),
+            visualDensity: VisualDensity.compact,
+          ),
         ),
+
+        SectionTitle(t.panel.ocrEngineSection),
+        HelpText(t.panel.ocrEngineHelp),
         SegmentedButton<OcrKind>(
           segments: const <ButtonSegment<OcrKind>>[
             ButtonSegment<OcrKind>(
@@ -1321,11 +1304,10 @@ class _LanguagesTab extends StatelessWidget {
             child: controller.windowsOcrAvailable
                 ? Text(
                     controller.windowsOcrCoversRequest
-                        ? 'Windows reconoce: '
-                              '${controller.windowsOcrLanguages.join(', ')}'
-                        : 'Windows no tiene el idioma pedido. Añádelo en '
-                              'Configuración → Hora e idioma → Idioma y región, '
-                              'o cambia a Tesseract.',
+                        ? t.panel.windowsRecognizes(
+                            controller.windowsOcrLanguages.join(', '),
+                          )
+                        : t.panel.windowsMissingLanguage,
                     style: TextStyle(
                       color: controller.windowsOcrCoversRequest
                           ? kMuted
@@ -1334,10 +1316,9 @@ class _LanguagesTab extends StatelessWidget {
                       height: 1.35,
                     ),
                   )
-                : const Text(
-                    'Comprueba los motores en Diagnóstico para saber qué '
-                    'idiomas reconoce este Windows.',
-                    style: TextStyle(
+                : Text(
+                    t.panel.checkEnginesFirst,
+                    style: const TextStyle(
                       color: kMuted,
                       fontSize: 10.5,
                       height: 1.35,
@@ -1345,16 +1326,13 @@ class _LanguagesTab extends StatelessWidget {
                   ),
           ),
 
-        const SectionTitle('Idioma del juego (lo que se lee)'),
-        const HelpText(
-          'El OCR necesita saber qué escritura leer. Elegir aquí "Japonés" '
-          'configura a la vez el paquete de OCR y el idioma de origen.',
-        ),
+        SectionTitle(t.panel.gameLanguageSection),
+        HelpText(t.panel.gameLanguageHelp),
         DropdownButtonFormField<String>(
           initialValue: ocrLanguage?.ocrCode,
           isExpanded: true,
           dropdownColor: kPanelSurface,
-          decoration: _dropdownDecoration('Escritura a reconocer'),
+          decoration: _dropdownDecoration(t.panel.scriptToRecognize),
           style: const TextStyle(color: Colors.white, fontSize: 12.5),
           items: <DropdownMenuItem<String>>[
             for (final LanguageOption option in sourceLanguages)
@@ -1364,7 +1342,7 @@ class _LanguagesTab extends StatelessWidget {
                   '${option.label}  ·  ${option.ocrCode}'
                   // El aviso de "no instalado" es cosa de Tesseract: el motor de
                   // Windows no usa estos paquetes y marcarlos ahi confundiria.
-                  '${e.ocrKind == OcrKind.tesseract && controller.installedOcrLanguages.isNotEmpty && !controller.installedOcrLanguages.contains(option.ocrCode) ? '  (no instalado)' : ''}',
+                  '${e.ocrKind == OcrKind.tesseract && controller.installedOcrLanguages.isNotEmpty && !controller.installedOcrLanguages.contains(option.ocrCode) ? t.panel.notInstalledSuffix : ''}',
                 ),
               ),
           ],
@@ -1376,10 +1354,10 @@ class _LanguagesTab extends StatelessWidget {
         ),
         if (ocrLanguage?.note != null) HelpText(ocrLanguage!.note!),
         SwitchRow(
-          label: 'Detectar idioma automáticamente al traducir',
+          label: t.panel.autoDetectLabel,
           subtitle: autoDetect
-              ? 'El traductor decide el idioma de origen.'
-              : 'Se envía "${e.sourceLanguage}" como idioma de origen.',
+              ? t.panel.autoDetectOn
+              : t.panel.autoDetectOff(e.sourceLanguage),
           value: autoDetect,
           onChanged: (bool v) {
             controller.setEngines(
@@ -1392,13 +1370,13 @@ class _LanguagesTab extends StatelessWidget {
           },
         ),
 
-        const SectionTitle('Traducir a'),
+        SectionTitle(t.panel.translateToSection),
         DropdownButtonFormField<String>(
           initialValue:
               targetByTranslateCode(e.targetLanguage)?.translateCode ?? 'es',
           isExpanded: true,
           dropdownColor: kPanelSurface,
-          decoration: _dropdownDecoration('Idioma de destino'),
+          decoration: _dropdownDecoration(t.panel.targetLanguageLabel),
           style: const TextStyle(color: Colors.white, fontSize: 12.5),
           items: <DropdownMenuItem<String>>[
             for (final LanguageOption option in targetLanguages)
@@ -1414,33 +1392,33 @@ class _LanguagesTab extends StatelessWidget {
           },
         ),
 
-        const SectionTitle('Motor de traducción'),
+        SectionTitle(t.panel.translatorSection),
         DropdownButtonFormField<TranslatorKind>(
           initialValue: e.translator,
           isExpanded: true,
           dropdownColor: kPanelSurface,
-          decoration: _dropdownDecoration('Motor'),
+          decoration: _dropdownDecoration(t.panel.translatorLabel),
           style: const TextStyle(color: Colors.white, fontSize: 12.5),
-          items: const <DropdownMenuItem<TranslatorKind>>[
+          items: <DropdownMenuItem<TranslatorKind>>[
             DropdownMenuItem<TranslatorKind>(
               value: TranslatorKind.googleFree,
-              child: Text('Google Traductor — gratis, sin clave'),
+              child: Text(t.panel.translatorGoogle),
             ),
             DropdownMenuItem<TranslatorKind>(
               value: TranslatorKind.claude,
-              child: Text('Claude — máxima calidad (API key)'),
+              child: Text(t.panel.translatorClaude),
             ),
             DropdownMenuItem<TranslatorKind>(
               value: TranslatorKind.deepl,
-              child: Text('DeepL — muy buena calidad (API key)'),
+              child: Text(t.panel.translatorDeepl),
             ),
             DropdownMenuItem<TranslatorKind>(
               value: TranslatorKind.libre,
-              child: Text('LibreTranslate — servidor propio'),
+              child: Text(t.panel.translatorLibre),
             ),
             DropdownMenuItem<TranslatorKind>(
               value: TranslatorKind.none,
-              child: Text('Sin traducir — solo mostrar el original'),
+              child: Text(t.panel.translatorNone),
             ),
           ],
           onChanged: (TranslatorKind? kind) {
@@ -1452,7 +1430,7 @@ class _LanguagesTab extends StatelessWidget {
 
         if (e.translator == TranslatorKind.claude) ...<Widget>[
           DebouncedTextField(
-            label: 'API key de Claude',
+            label: t.panel.claudeKeyLabel,
             hint: 'sk-ant-...',
             initialValue: e.claudeKey,
             obscure: true,
@@ -1460,7 +1438,7 @@ class _LanguagesTab extends StatelessWidget {
                 controller.setEngines(e.copyWith(claudeKey: v.trim())),
           ),
           DebouncedTextField(
-            label: 'Modelo',
+            label: t.panel.modelLabel,
             initialValue: e.claudeModel,
             onSubmitted: (String v) => controller.setEngines(
               e.copyWith(
@@ -1468,15 +1446,12 @@ class _LanguagesTab extends StatelessWidget {
               ),
             ),
           ),
-          const HelpText(
-            'Traduce entendiendo el contexto del juego: mantiene el tono y no '
-            'destroza los nombres propios. Es de pago por uso.',
-          ),
+          HelpText(t.panel.claudeHelp),
         ],
         if (e.translator == TranslatorKind.deepl)
           DebouncedTextField(
-            label: 'API key de DeepL',
-            hint: 'Las claves gratuitas terminan en :fx',
+            label: t.panel.deeplKeyLabel,
+            hint: t.panel.deeplKeyHint,
             initialValue: e.deeplKey,
             obscure: true,
             onSubmitted: (String v) =>
@@ -1484,20 +1459,17 @@ class _LanguagesTab extends StatelessWidget {
           ),
         if (e.translator == TranslatorKind.libre)
           DebouncedTextField(
-            label: 'URL de LibreTranslate',
+            label: t.panel.libreUrlLabel,
             hint: 'http://localhost:5000',
             initialValue: e.libreTranslateUrl,
             onSubmitted: (String v) =>
                 controller.setEngines(e.copyWith(libreTranslateUrl: v.trim())),
           ),
 
-        const SectionTitle('Glosario'),
-        const HelpText(
-          'Términos que no deben traducirse o que tienen una traducción fija. '
-          'Una línea por entrada. Solo lo aplica el motor Claude.',
-        ),
+        SectionTitle(t.panel.glossarySection),
+        HelpText(t.panel.glossaryHelp),
         DebouncedTextField(
-          label: 'Glosario',
+          label: t.panel.glossaryLabel,
           hint: 'Hollow Knight = Hollow Knight\nEstus Flask = Frasco de Estus',
           initialValue: e.glossary,
           maxLines: 4,
@@ -1525,9 +1497,9 @@ class _StyleTab extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         ZoneConsole(controller: controller, zone: PanelZone.style),
-        const SectionTitle('Texto'),
+        SectionTitle(t.panel.textSection),
         SliderRow(
-          label: 'Tamaño',
+          label: t.panel.fontSizeLabel,
           value: st.fontSize,
           min: 12,
           max: 84,
@@ -1535,7 +1507,7 @@ class _StyleTab extends StatelessWidget {
           suffix: ' px',
         ),
         SliderRow(
-          label: 'Altura de línea',
+          label: t.panel.lineHeightLabel,
           value: st.lineHeight,
           min: 0.9,
           max: 2.2,
@@ -1543,7 +1515,7 @@ class _StyleTab extends StatelessWidget {
           onChanged: (double v) => update(st.copyWith(lineHeight: v)),
         ),
         SliderRow(
-          label: 'Espaciado',
+          label: t.panel.letterSpacingLabel,
           value: st.letterSpacing,
           min: -1,
           max: 6,
@@ -1551,7 +1523,7 @@ class _StyleTab extends StatelessWidget {
           onChanged: (double v) => update(st.copyWith(letterSpacing: v)),
         ),
         SliderRow(
-          label: 'Líneas máximas',
+          label: t.panel.maxLinesLabel,
           value: st.maxLines.toDouble(),
           min: 1,
           max: 10,
@@ -1559,17 +1531,14 @@ class _StyleTab extends StatelessWidget {
           onChanged: (double v) => update(st.copyWith(maxLines: v.round())),
         ),
         SwitchRow(
-          label: 'Historial en la caja',
-          subtitle: st.showHistory
-              ? 'Se ven también las líneas anteriores, con scroll. Activa la '
-                    'caja para poder subir a leerlas con la rueda.'
-              : 'Solo la última línea traducida.',
+          label: t.panel.historyLabel,
+          subtitle: st.showHistory ? t.panel.historyOn : t.panel.historyOff,
           value: st.showHistory,
           onChanged: (bool v) => update(st.copyWith(showHistory: v)),
         ),
         if (st.showHistory)
           SliderRow(
-            label: 'Líneas recordadas',
+            label: t.panel.rememberedLinesLabel,
             value: st.historyLength.toDouble(),
             min: 2,
             max: 40,
@@ -1583,21 +1552,19 @@ class _StyleTab extends StatelessWidget {
             child: OutlinedButton.icon(
               onPressed: controller.clearSubtitleHistory,
               icon: const Icon(Icons.delete_sweep, size: 15),
-              label: const Text('Vaciar el historial'),
+              label: Text(t.panel.clearHistory),
               style: _outlined,
             ),
           ),
         SwitchRow(
-          label: 'Ajustar el texto a la caja',
-          subtitle: st.autoFit
-              ? 'La letra se encoge lo necesario para que entre el texto entero.'
-              : 'Tamaño fijo: el texto largo se recorta.',
+          label: t.panel.autoFitLabel,
+          subtitle: st.autoFit ? t.panel.autoFitOn : t.panel.autoFitOff,
           value: st.autoFit,
           onChanged: (bool v) => update(st.copyWith(autoFit: v)),
         ),
         if (st.autoFit)
           SliderRow(
-            label: 'Encogido máximo',
+            label: t.panel.minShrinkLabel,
             value: st.minFontScale * 100,
             min: 30,
             max: 100,
@@ -1605,24 +1572,19 @@ class _StyleTab extends StatelessWidget {
             suffix: ' %',
             onChanged: (double v) => update(st.copyWith(minFontScale: v / 100)),
           ),
-        if (st.autoFit)
-          const HelpText(
-            'Hasta dónde puede encogerse la letra. Un texto que entra pero no se '
-            'puede leer no sirve, así que por debajo de este límite se recorta '
-            'en lugar de seguir reduciendo.',
-          ),
+        if (st.autoFit) HelpText(t.panel.minShrinkHelp),
         Row(
           children: <Widget>[
             Expanded(
               child: SwitchRow(
-                label: 'Negrita',
+                label: t.panel.boldLabel,
                 value: st.bold,
                 onChanged: (bool v) => update(st.copyWith(bold: v)),
               ),
             ),
             Expanded(
               child: SwitchRow(
-                label: 'Cursiva',
+                label: t.panel.italicLabel,
                 value: st.italic,
                 onChanged: (bool v) => update(st.copyWith(italic: v)),
               ),
@@ -1630,7 +1592,7 @@ class _StyleTab extends StatelessWidget {
           ],
         ),
         DebouncedTextField(
-          label: 'Fuente',
+          label: t.panel.fontLabel,
           hint: 'Segoe UI, Arial, Consolas…',
           initialValue: st.fontFamily,
           onSubmitted: (String v) => update(
@@ -1658,13 +1620,10 @@ class _StyleTab extends StatelessWidget {
           style: ButtonStyle(visualDensity: VisualDensity.compact),
         ),
 
-        const SectionTitle('Legibilidad'),
-        const HelpText(
-          'El contorno es lo que mantiene el texto legible sobre cualquier '
-          'escena; el fondo semitransparente ayuda en fondos muy movidos.',
-        ),
+        SectionTitle(t.panel.readabilitySection),
+        HelpText(t.panel.readabilityHelp),
         SliderRow(
-          label: 'Grosor contorno',
+          label: t.panel.outlineWidthLabel,
           value: st.outlineWidth,
           min: 0,
           max: 10,
@@ -1672,7 +1631,7 @@ class _StyleTab extends StatelessWidget {
           onChanged: (double v) => update(st.copyWith(outlineWidth: v)),
         ),
         SliderRow(
-          label: 'Opacidad fondo',
+          label: t.panel.backgroundOpacityLabel,
           value: st.backgroundOpacity,
           min: 0,
           max: 1,
@@ -1680,44 +1639,44 @@ class _StyleTab extends StatelessWidget {
           onChanged: (double v) => update(st.copyWith(backgroundOpacity: v)),
         ),
         SliderRow(
-          label: 'Redondeo',
+          label: t.panel.cornerRadiusLabel,
           value: st.cornerRadius,
           min: 0,
           max: 32,
           onChanged: (double v) => update(st.copyWith(cornerRadius: v)),
         ),
         SliderRow(
-          label: 'Margen interno',
+          label: t.panel.paddingLabel,
           value: st.padding,
           min: 0,
           max: 40,
           onChanged: (double v) => update(st.copyWith(padding: v)),
         ),
         SwitchRow(
-          label: 'Sombra',
+          label: t.panel.shadowLabel,
           value: st.shadow,
           onChanged: (bool v) => update(st.copyWith(shadow: v)),
         ),
         SwitchRow(
-          label: 'Mostrar también el texto original',
-          subtitle: 'Útil para aprender el idioma o revisar el OCR.',
+          label: t.panel.showOriginalLabel,
+          subtitle: t.panel.showOriginalSubtitle,
           value: st.showOriginal,
           onChanged: (bool v) => update(st.copyWith(showOriginal: v)),
         ),
 
-        const SectionTitle('Colores'),
+        SectionTitle(t.panel.colorsSection),
         ColorPickerRow(
-          label: 'Color del texto',
+          label: t.panel.textColorLabel,
           color: st.textColor,
           onChanged: (Color c) => update(st.copyWith(textColor: c)),
         ),
         ColorPickerRow(
-          label: 'Color del contorno',
+          label: t.panel.outlineColorLabel,
           color: st.outlineColor,
           onChanged: (Color c) => update(st.copyWith(outlineColor: c)),
         ),
         ColorPickerRow(
-          label: 'Color del fondo',
+          label: t.panel.backgroundColorLabel,
           color: st.backgroundColor,
           onChanged: (Color c) => update(st.copyWith(backgroundColor: c)),
         ),
@@ -1742,13 +1701,10 @@ class _PerformanceTab extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         ZoneConsole(controller: controller, zone: PanelZone.performance),
-        const SectionTitle('Frecuencia'),
-        const HelpText(
-          'Intervalo entre capturas. Más bajo responde antes pero consume más '
-          'CPU y más cuota de traducción.',
-        ),
+        SectionTitle(t.panel.frequencySection),
+        HelpText(t.panel.frequencyHelp),
         SliderRow(
-          label: 'Intervalo',
+          label: t.panel.intervalLabel,
           value: p.intervalMs.toDouble(),
           min: 150,
           max: 2000,
@@ -1758,11 +1714,11 @@ class _PerformanceTab extends StatelessWidget {
               controller.setPipelineSettings(p.copyWith(intervalMs: v.round())),
         ),
         Text(
-          '≈ ${(1000 / p.intervalMs).toStringAsFixed(1)} capturas por segundo',
+          t.panel.capturesPerSecond((1000 / p.intervalMs).toStringAsFixed(1)),
           style: const TextStyle(color: kMuted, fontSize: 11),
         ),
         SliderRow(
-          label: 'Cambio mínimo',
+          label: t.panel.minChangeLabel,
           value: p.minChangePercent,
           min: 0.1,
           max: 10,
@@ -1771,18 +1727,14 @@ class _PerformanceTab extends StatelessWidget {
           onChanged: (double v) =>
               controller.setPipelineSettings(p.copyWith(minChangePercent: v)),
         ),
-        const HelpText(
-          'Cuánto tiene que cambiar la zona para volver a leerla. Bájalo si no '
-          'detecta diálogos nuevos; súbelo si traduce de más en escenas con '
-          'fondos animados.',
-        ),
+        HelpText(t.panel.minChangeHelp),
         SliderRow(
-          label: 'Estabilidad',
+          label: t.panel.stabilityLabel,
           value: p.stabilityFrames.toDouble(),
           min: 1,
           max: 5,
           divisions: 4,
-          suffix: ' fot.',
+          suffix: t.panel.stabilityFramesSuffix,
           onChanged: (double v) => controller.setPipelineSettings(
             p.copyWith(stabilityFrames: v.round()),
           ),
@@ -1792,7 +1744,7 @@ class _PerformanceTab extends StatelessWidget {
           'escriben el diálogo letra a letra.',
         ),
         SliderRow(
-          label: 'Permanencia',
+          label: t.panel.holdLabel,
           value: p.holdMs.toDouble(),
           min: 0,
           max: 10000,
@@ -1810,7 +1762,7 @@ class _PerformanceTab extends StatelessWidget {
           'Ajustar esto mejora la precisión del OCR más que cambiar de motor.',
         ),
         SliderRow(
-          label: 'Escala',
+          label: t.panel.scaleLabel,
           value: pre.scale,
           min: 1,
           max: 4,
@@ -1821,7 +1773,7 @@ class _PerformanceTab extends StatelessWidget {
               controller.setPreprocess(pre.copyWith(scale: v)),
         ),
         SliderRow(
-          label: 'Contraste',
+          label: t.panel.contrastLabel,
           value: pre.contrast,
           min: 0.5,
           max: 3,
@@ -1830,7 +1782,7 @@ class _PerformanceTab extends StatelessWidget {
               controller.setPreprocess(pre.copyWith(contrast: v)),
         ),
         SliderRow(
-          label: 'Binarizar',
+          label: t.panel.binarizeLabel,
           value: pre.threshold.toDouble(),
           min: 0,
           max: 255,
@@ -1842,29 +1794,29 @@ class _PerformanceTab extends StatelessWidget {
           'fondos complejos.',
         ),
         SwitchRow(
-          label: 'Escala de grises',
+          label: t.panel.grayscaleLabel,
           value: pre.grayscale,
           onChanged: (bool v) =>
               controller.setPreprocess(pre.copyWith(grayscale: v)),
         ),
         SwitchRow(
-          label: 'Invertir',
+          label: t.panel.invertLabel,
           subtitle: 'Prueba a activarlo con texto claro sobre fondo oscuro.',
           value: pre.invert,
           onChanged: (bool v) =>
               controller.setPreprocess(pre.copyWith(invert: v)),
         ),
         SwitchRow(
-          label: 'Reducir ruido',
+          label: t.panel.denoiseLabel,
           subtitle: 'Suaviza antes de leer. Útil con vídeo comprimido.',
           value: pre.denoise,
           onChanged: (bool v) =>
               controller.setPreprocess(pre.copyWith(denoise: v)),
         ),
 
-        const SectionTitle('Tiempos de espera'),
+        SectionTitle(t.panel.timeoutsSection),
         SliderRow(
-          label: 'OCR',
+          label: t.panel.ocrLabel,
           value: p.ocrTimeoutMs.toDouble(),
           min: 1000,
           max: 15000,
@@ -1875,7 +1827,7 @@ class _PerformanceTab extends StatelessWidget {
           ),
         ),
         SliderRow(
-          label: 'Traducción',
+          label: t.panel.translationLabel,
           value: p.translateTimeoutMs.toDouble(),
           min: 1000,
           max: 30000,
@@ -1907,14 +1859,14 @@ class _DiagnosticsTab extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         ZoneConsole(controller: controller, zone: PanelZone.diagnostics),
-        const SectionTitle('Estado de los motores'),
+        SectionTitle(t.panel.enginesSection),
         Row(
           children: <Widget>[
             Expanded(
               child: OutlinedButton.icon(
                 onPressed: controller.refreshEngineHealth,
                 icon: const Icon(Icons.health_and_safety, size: 15),
-                label: const Text('Comprobar'),
+                label: Text(t.panel.check),
                 style: _outlined,
               ),
             ),
@@ -1923,7 +1875,7 @@ class _DiagnosticsTab extends StatelessWidget {
               child: OutlinedButton.icon(
                 onPressed: controller.testOnce,
                 icon: const Icon(Icons.play_circle_outline, size: 15),
-                label: const Text('Probar ahora'),
+                label: Text(t.panel.testNow),
                 style: _outlined,
               ),
             ),
@@ -1931,8 +1883,8 @@ class _DiagnosticsTab extends StatelessWidget {
         ),
         _healthCard(
           controller.settings.engines.ocrKind == OcrKind.windows
-              ? 'OCR (Windows)'
-              : 'OCR (Tesseract)',
+              ? t.panel.ocrEngineWindowsName
+              : t.panel.ocrEngineTesseractName,
           ocr,
         ),
         _healthCard('Traductor', translator),
@@ -1945,21 +1897,21 @@ class _DiagnosticsTab extends StatelessWidget {
           ),
         ],
 
-        const SectionTitle('Rutas'),
+        SectionTitle(t.panel.pathsSection),
         const HelpText(
           'Traducy no necesita permisos de administrador: los paquetes de idioma '
           'se guardan en su propia carpeta, no en la de Tesseract.',
         ),
         DebouncedTextField(
-          label: 'Ejecutable de Tesseract (vacío = autodetectar)',
-          hint: r'C:\Program Files\Tesseract-OCR\tesseract.exe',
+          label: t.panel.tesseractExeLabel,
+          hint: t.panel.tesseractExeHint,
           initialValue: controller.settings.engines.tesseractPath,
           onSubmitted: (String v) => controller.setEngines(
             controller.settings.engines.copyWith(tesseractPath: v.trim()),
           ),
         ),
         DebouncedTextField(
-          label: 'Carpeta de idiomas descargados (vacío = por defecto)',
+          label: t.panel.tessdataFolderLabel,
           hint: controller.tessdataDirectory,
           initialValue: controller.settings.engines.tessdataDir,
           onSubmitted: controller.setTessdataDir,
@@ -2053,7 +2005,7 @@ class _DiagnosticsTab extends StatelessWidget {
           ),
         ],
 
-        const SectionTitle('Registro'),
+        SectionTitle(t.panel.logSection),
         Container(
           height: 150,
           padding: const EdgeInsets.all(8),
@@ -2106,10 +2058,7 @@ class _DiagnosticsTab extends StatelessWidget {
         TextButton.icon(
           onPressed: log.clear,
           icon: const Icon(Icons.delete_outline, size: 15),
-          label: const Text(
-            'Limpiar registro',
-            style: TextStyle(fontSize: 11.5),
-          ),
+          label: Text(t.panel.clearLog, style: const TextStyle(fontSize: 11.5)),
         ),
 
         UpdateSection(
@@ -2117,7 +2066,7 @@ class _DiagnosticsTab extends StatelessWidget {
           onInstall: controller.onRequestUpdateInstall,
         ),
 
-        const SectionTitle('Atajos de teclado'),
+        SectionTitle(t.panel.shortcutsSection),
         _statRow('Ctrl + Alt + T', 'Mostrar / ocultar el panel'),
         _statRow('Ctrl + Alt + P', 'Pausar / reanudar la traducción'),
         _statRow('Ctrl + Alt + H', 'Ocultar / mostrar los subtítulos'),
@@ -2128,24 +2077,25 @@ class _DiagnosticsTab extends StatelessWidget {
   Widget _healthCard(String title, EngineHealth health) {
     if (health.checking) {
       return NoticeCard(
-        message: '$title: comprobando…',
+        message: t.panel.healthChecking(title),
         severity: NoticeSeverity.info,
       );
     }
-    if (health.issue != null) {
+    final String? issue = health.issue;
+    if (issue != null) {
       return NoticeCard(
-        message: '$title: ${health.issue}',
+        message: t.panel.healthIssue(title, issue),
         severity: NoticeSeverity.error,
       );
     }
     if (health.isReady) {
       return NoticeCard(
-        message: '$title: listo',
+        message: t.panel.healthReady(title),
         severity: NoticeSeverity.success,
       );
     }
     return NoticeCard(
-      message: '$title: sin comprobar',
+      message: t.panel.healthUnchecked(title),
       severity: NoticeSeverity.info,
     );
   }

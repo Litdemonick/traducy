@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/about.dart';
+import '../i18n/strings.dart';
 import '../models/settings.dart';
 import '../pipeline/pipeline.dart';
 import '../state/app_controller.dart';
@@ -128,14 +129,11 @@ class ZoneConsole extends StatelessWidget {
           return _ZoneInfo(
             color: kDanger,
             icon: Icons.crop_free,
-            headline: 'Sin zona de captura',
-            body:
-                'Traducy no sabe todavía de qué parte de la pantalla leer. '
-                'Pulsa "Banda inferior" para empezar por donde casi todos los '
-                'juegos ponen los diálogos.',
-            tips: const <String>[
-              'Activa "Activar zona de captura" para ver el rectángulo verde.',
-              'Se mueve por su barra de título; el interior deja pasar los clics.',
+            headline: t.panel.consoleNoZoneHeadline,
+            body: t.panel.consoleNoZoneBody,
+            tips: <String>[
+              t.panel.consoleNoZoneTip1,
+              t.panel.consoleNoZoneTip2,
             ],
           );
         }
@@ -143,27 +141,24 @@ class ZoneConsole extends StatelessWidget {
           return _ZoneInfo(
             color: kDanger,
             icon: Icons.warning_amber_rounded,
-            headline: 'Los subtítulos se solapan con la zona',
-            body:
-                'El OCR leería su propia traducción y entraría en bucle. Mueve '
-                'la caja de subtítulos fuera del rectángulo verde.',
+            headline: t.panel.consoleOverlapHeadline,
+            body: t.panel.consoleOverlapBody,
             tips: const <String>[],
           );
         }
         return _ZoneInfo(
           color: kRegionAccent,
           icon: Icons.check_circle_outline,
-          headline: 'Zona lista: ${region.width}×${region.height} px',
+          headline: t.panel.consoleZoneReadyHeadline(
+            region.width,
+            region.height,
+          ),
           body: s.regionMode == RegionMode.followWindow
-              ? 'La zona sigue a la ventana "${s.followWindowTitle}": si mueves '
-                    'el juego, la zona lo acompaña.'
-              : 'Zona fija en la pantalla. Cuanto más ceñida al texto, mejor '
-                    'lee el OCR y menos CPU gasta.',
+              ? t.panel.consoleZoneFollowBody(s.followWindowTitle)
+              : t.panel.consoleZoneFixedBody,
           tips: <String>[
-            if (!s.regionLocked)
-              'Cuando la tengas puesta, ciérrala con el candado de su barra.',
-            if (s.regionLocked)
-              'Está bloqueada: quita el candado si quieres moverla.',
+            if (!s.regionLocked) t.panel.consoleZoneTipLock,
+            if (s.regionLocked) t.panel.consoleZoneTipLocked,
           ],
         );
 
@@ -172,72 +167,48 @@ class ZoneConsole extends StatelessWidget {
           return _ZoneInfo(
             color: kDanger,
             icon: Icons.language,
-            headline: 'Falta el idioma "${c.missingOcrLanguages.join(', ')}"',
-            body:
-                'El OCR necesita un paquete por cada escritura que lee. Púlsalo '
-                'en el aviso de arriba y se descarga solo, sin permisos de '
-                'administrador.',
+            headline: t.panel.consoleMissingLanguageHeadline(
+              c.missingOcrLanguages.join(', '),
+            ),
+            body: t.panel.consoleMissingLanguageBody,
             tips: const <String>[],
           );
         }
         return _ZoneInfo(
           color: kAccent,
           icon: Icons.translate,
-          headline:
-              'Leyendo "${s.engines.ocrLanguages}" → '
-              '${s.engines.targetLanguage}',
-          body: s.engines.translator == TranslatorKind.claude
-              ? 'Claude entiende el contexto del juego: mantiene el tono y no '
-                    'destroza los nombres propios. Es de pago por uso.'
-              : s.engines.translator == TranslatorKind.googleFree
-              ? 'Google Traductor no necesita clave. Si limita las peticiones, '
-                    'sube el intervalo en Rendimiento o cambia de motor.'
-              : 'Motor: ${s.engines.translator.name}.',
-          tips: <String>[
-            if (s.engines.sourceLanguage == 'auto')
-              'El idioma de origen se detecta solo al traducir.',
-            if (s.engines.translator == TranslatorKind.claude &&
-                s.engines.glossary.trim().isEmpty)
-              'Añade un glosario para fijar nombres propios del juego.',
-          ],
+          headline: t.panel.consoleLanguagesReadyHeadline(
+            s.engines.ocrLanguages,
+            s.engines.targetLanguage,
+          ),
+          body: s.engines.sourceLanguage == 'auto'
+              ? t.panel.consoleLanguagesAutoBody
+              : t.panel.consoleLanguagesFixedBody(s.engines.sourceLanguage),
+          tips: <String>[t.panel.consoleLanguagesTipEngine],
         );
 
       case PanelZone.style:
         return _ZoneInfo(
           color: kSubtitleAccent,
           icon: Icons.text_fields,
-          headline: 'Aspecto de los subtítulos',
-          body:
-              'Los cambios se ven al momento en la caja de texto. Activa '
-              '"Editar caja de subtítulos" en Zona si quieres verla mientras '
-              'ajustas.',
-          tips: const <String>[
-            'El contorno es lo que mantiene el texto legible sobre cualquier '
-                'escena; súbelo antes que el fondo.',
-            'Mostrar el original ayuda a comprobar si el OCR lee bien.',
-          ],
+          headline: t.panel.consoleStyleHeadline,
+          body: t.panel.consoleStyleBody,
+          tips: <String>[t.panel.consoleStyleTip1, t.panel.consoleStyleTip2],
         );
 
       case PanelZone.performance:
         final int skipped = status?.skippedUnchanged ?? 0;
         final int frames = status?.frames ?? 0;
-        final int percent = frames > 0 ? (100 * skipped / frames).round() : 0;
         return _ZoneInfo(
           color: kAccent,
           icon: Icons.speed,
-          headline: frames > 0
-              ? 'Ahorrando el $percent % de las capturas'
-              : 'Ajustes de velocidad y precisión',
+          headline: t.panel.consolePerformanceHeadline,
           body: frames > 0
-              ? 'Cuando la imagen no cambia, Traducy se salta el OCR y la '
-                    'traducción. Un porcentaje alto es buena señal.'
-              : 'Bajar el intervalo responde antes pero consume más CPU y más '
-                    'cuota de traducción.',
-          tips: const <String>[
-            'Si el OCR falla, sube la escala a 2× o 3×: es el ajuste con más '
-                'efecto.',
-            'Si traduce de más en escenas animadas, sube el umbral de cambio.',
-            'Si salen frases a medias, sube la estabilidad a 3 o 4 fotogramas.',
+              ? t.panel.consolePerformanceBody(frames, skipped)
+              : t.panel.consolePerformanceIdleBody,
+          tips: <String>[
+            t.panel.consolePerformanceTip1,
+            t.panel.consolePerformanceTip2,
           ],
         );
 
@@ -248,41 +219,29 @@ class ZoneConsole extends StatelessWidget {
           return _ZoneInfo(
             color: kSubtitleAccent,
             icon: Icons.health_and_safety,
-            headline: 'Comprobación de motores pendiente',
-            body:
-                'Pulsa "Comprobar" para ver si el OCR y el traductor responden. '
-                '"Probar ahora" hace una captura completa y dice cuánto tardó '
-                'cada etapa.',
+            headline: t.panel.consoleEnginesPendingHeadline,
+            body: t.panel.consoleEnginesPendingBody,
             tips: const <String>[],
           );
         }
         return _ZoneInfo(
           color: kRegionAccent,
           icon: Icons.verified,
-          headline: 'OCR y traductor operativos',
-          body:
-              'Aquí ves las rutas donde se guarda todo, los contadores del '
-              'pipeline y el registro de eventos. Es lo primero que hay que '
-              'mirar si algo deja de funcionar.',
-          tips: const <String>[
-            'El registro guarda los últimos 400 eventos con su hora.',
-          ],
+          headline: t.panel.consoleEnginesReadyHeadline,
+          body: t.panel.consoleEnginesReadyBody,
+          tips: <String>[t.panel.consoleEnginesTip],
         );
 
       case PanelZone.about:
         return _ZoneInfo(
           color: kAccent,
           icon: Icons.info_outline,
-          headline: 'Versión ${c.currentVersion} · ${About.author}',
-          body:
-              'Datos del proyecto y la carpeta donde Traducy guarda todo. Los '
-              'enlaces se copian al portapapeles en vez de abrirse: sacar un '
-              'navegador por encima del juego estorba más de lo que ayuda.',
-          tips: const <String>[
-            'Pega el enlace del repositorio en el navegador para ver el código.',
-            'Si algo no funciona, el enlace de incidencias es el sitio donde '
-                'contarlo.',
-          ],
+          headline: t.panel.consoleAboutHeadline(
+            c.currentVersion,
+            About.author,
+          ),
+          body: t.panel.consoleAboutBody,
+          tips: <String>[t.panel.consoleAboutTip1, t.panel.consoleAboutTip2],
         );
     }
   }

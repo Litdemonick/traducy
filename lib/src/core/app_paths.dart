@@ -110,6 +110,15 @@ class AppPaths {
   Directory get tessdataDirectory =>
       Directory('${dataDirectory.path}${Platform.pathSeparator}tessdata');
 
+  /// Idioma que eligió el usuario en el instalador, si lo dejó escrito.
+  ///
+  /// Lo escribe el instalador de Inno con el idioma de su asistente. Se lee una
+  /// sola vez, en el primer arranque: quien instala en inglés abre Traducy en
+  /// inglés sin tener que buscar el ajuste. Después manda lo que elija en el
+  /// panel.
+  File get installerLanguageFile =>
+      File('${dataDirectory.path}${Platform.pathSeparator}idioma.txt');
+
   /// Carpeta donde el actualizador guarda los instaladores que descarga.
   Directory get updatesDirectory =>
       Directory('${dataDirectory.path}${Platform.pathSeparator}updates');

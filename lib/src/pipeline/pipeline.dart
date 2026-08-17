@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 
 import '../core/failures.dart';
 import '../core/logx.dart';
+import '../i18n/strings.dart';
 import '../models/settings.dart';
 import '../native/screen_capture.dart';
 import '../ocr/image_prep.dart';
@@ -194,7 +195,7 @@ class TranslationPipeline {
     _restartTimer();
     _setStatus(
       state: PipelineState.running,
-      message: 'En marcha',
+      message: t.panel.pipelineRunning,
       clearHint: true,
       clearStage: true,
     );
@@ -212,7 +213,7 @@ class TranslationPipeline {
     _pendingKey = null;
     _pendingText = null;
     _pendingCount = 0;
-    _setStatus(state: PipelineState.stopped, message: 'Detenido');
+    _setStatus(state: PipelineState.stopped, message: t.panel.pipelineStopped);
     log.i('pipeline', 'Detenido');
   }
 
@@ -220,7 +221,7 @@ class TranslationPipeline {
     if (!isRunning) return;
     _timer?.cancel();
     _timer = null;
-    _setStatus(state: PipelineState.paused, message: 'En pausa');
+    _setStatus(state: PipelineState.paused, message: t.panel.pipelinePaused);
   }
 
   void resume() {
@@ -230,7 +231,7 @@ class TranslationPipeline {
     _restartTimer();
     _setStatus(
       state: PipelineState.running,
-      message: 'En marcha',
+      message: t.panel.pipelineRunning,
       clearHint: true,
       clearStage: true,
     );
@@ -318,7 +319,7 @@ class TranslationPipeline {
     } catch (e, st) {
       log.e('pipeline', 'Error inesperado en el ciclo', e, st);
       _handleFailure(
-        StageFailure(Stage.render, 'Error inesperado: $e', cause: e),
+        StageFailure(Stage.render, t.panel.pipelineUnexpected('$e'), cause: e),
       );
     } finally {
       _busy = false;
@@ -329,8 +330,8 @@ class TranslationPipeline {
     final CaptureRegion region = resolveRegion();
     if (!region.isValid) {
       _setStatus(
-        message: 'Define la zona de captura',
-        hint: 'Arrastra el rectángulo sobre el texto del juego.',
+        message: t.panel.pipelineDefineZone,
+        hint: t.panel.pipelineDefineZoneHint,
       );
       return;
     }
@@ -347,8 +348,8 @@ class TranslationPipeline {
     if (frame == null) {
       throw StageFailure(
         Stage.capture,
-        'No se pudo capturar la pantalla.',
-        hint: 'Comprueba que la zona esté dentro de un monitor activo.',
+        t.panel.pipelineCaptureFailed,
+        hint: t.panel.pipelineCaptureFailedHint,
       );
     }
 
@@ -366,8 +367,8 @@ class TranslationPipeline {
       }
       _setStatus(
         state: PipelineState.failing,
-        message: 'La zona se captura en negro',
-        hint: 'Pon el juego en modo ventana o sin bordes.',
+        message: t.panel.pipelineBlackFrame,
+        hint: t.panel.pipelineBlackFrameHint,
         frames: status.value.frames + 1,
         lastCaptureMs: captureMs,
       );
@@ -398,8 +399,8 @@ class TranslationPipeline {
     } catch (e) {
       throw StageFailure(
         Stage.preprocess,
-        'Fallo al preparar la imagen.',
-        hint: 'Prueba a bajar la escala de preprocesado.',
+        t.panel.pipelinePrepFailed,
+        hint: t.panel.pipelinePrepFailedHint,
         cause: e,
       );
     }
@@ -419,10 +420,8 @@ class TranslationPipeline {
       _expireSubtitleIfStale();
       _setStatus(
         state: PipelineState.running,
-        message: 'La zona no ve texto (imagen plana)',
-        hint:
-            'Comprueba que el rectángulo esté encima del texto del juego y que '
-            'el juego esté en modo ventana o sin bordes.',
+        message: t.panel.pipelineFlatFrame,
+        hint: t.panel.pipelineFlatFrameHint,
         frames: status.value.frames + 1,
         skippedUnchanged: status.value.skippedUnchanged + 1,
         lastCaptureMs: captureMs,
@@ -462,7 +461,7 @@ class TranslationPipeline {
           }
           _setStatus(
             state: PipelineState.running,
-            message: 'Esperando texto estable',
+            message: t.panel.pipelineWaitingStable,
             frames: status.value.frames + 1,
             lastCaptureMs: captureMs,
             lastPrepMs: prepMs,
@@ -478,7 +477,7 @@ class TranslationPipeline {
           state: PipelineState.running,
           // Con el número delante se puede ajustar el umbral con criterio en
           // lugar de a ciegas.
-          message: 'Sin cambios (${changed.toStringAsFixed(1)} %)',
+          message: t.panel.pipelineUnchanged(changed.toStringAsFixed(1)),
           frames: status.value.frames + 1,
           skippedUnchanged: status.value.skippedUnchanged + 1,
           lastCaptureMs: captureMs,
@@ -507,7 +506,7 @@ class TranslationPipeline {
       _pendingCount = 0;
       _setStatus(
         state: PipelineState.running,
-        message: 'Sin texto en la zona',
+        message: t.panel.pipelineNoText,
         frames: status.value.frames + 1,
         ocrRuns: status.value.ocrRuns + 1,
         lastCaptureMs: captureMs,
@@ -526,7 +525,7 @@ class TranslationPipeline {
     if (!force && key == _lastTranslatedKey) {
       _setStatus(
         state: PipelineState.running,
-        message: 'Texto ya traducido',
+        message: t.panel.pipelineAlreadyTranslated,
         frames: status.value.frames + 1,
         ocrRuns: status.value.ocrRuns + 1,
         lastCaptureMs: captureMs,
@@ -557,7 +556,7 @@ class TranslationPipeline {
         _hurryNextCycle();
         _setStatus(
           state: PipelineState.running,
-          message: 'Esperando texto estable',
+          message: t.panel.pipelineWaitingStable,
           frames: status.value.frames + 1,
           ocrRuns: status.value.ocrRuns + 1,
           lastCaptureMs: captureMs,
@@ -618,7 +617,9 @@ class TranslationPipeline {
 
     _setStatus(
       state: PipelineState.running,
-      message: translation.fromCache ? 'Traducido (caché)' : 'Traducido',
+      message: translation.fromCache
+          ? t.panel.pipelineTranslatedCached
+          : t.panel.pipelineTranslated,
       frames: status.value.frames + 1,
       ocrRuns: status.value.ocrRuns + (countOcrRun ? 1 : 0),
       translations: status.value.translations + 1,
@@ -710,8 +711,11 @@ class TranslationPipeline {
       _timer = null;
       _setStatus(
         state: PipelineState.paused,
-        message: 'Pausado tras $_consecutiveErrors errores: ${failure.message}',
-        hint: failure.hint ?? 'Corrige el problema y pulsa Reanudar.',
+        message: t.panel.pipelineAutoPaused(
+          _consecutiveErrors,
+          failure.message,
+        ),
+        hint: failure.hint ?? t.panel.pipelineAutoPausedHint,
         failedStage: failure.stage,
       );
       log.e(

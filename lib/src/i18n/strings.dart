@@ -1,5 +1,8 @@
 import 'package:flutter/foundation.dart';
 
+import 'panel_strings.dart';
+import 'panel_strings_en.dart';
+import 'panel_strings_es.dart';
 import 'strings_en.dart';
 import 'strings_es.dart';
 
@@ -29,6 +32,12 @@ abstract class AppStrings {
 
   /// Código ISO del idioma, para mostrarlo y para depurar.
   String get localeCode;
+
+  /// Textos del panel de control y de sus consolas.
+  ///
+  /// Van aparte por volumen: son la mayor parte de lo que se lee en Traducy.
+  PanelStrings get panel =>
+      localeCode == 'es' ? const PanelStringsEs() : const PanelStringsEn();
 
   // ------------------------------------------------------------- general
   String get appTagline;

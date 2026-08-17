@@ -29,6 +29,19 @@ class SettingsStore {
 
   String get filePath => _file.path;
 
+  /// `true` si ya hay ajustes guardados de una sesión anterior.
+  ///
+  /// Se consulta antes de cargar, para distinguir el primer arranque: solo en él
+  /// se adopta el idioma que dejó escrito el instalador, y a partir de ahí manda
+  /// lo que el usuario haya elegido en el panel.
+  bool get settingsFileExists {
+    try {
+      return _file.existsSync();
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<AppSettings> load() async {
     try {
       if (!await _file.exists()) {

@@ -13,10 +13,10 @@
 
 #define MyAppName "Traducy"
 ; Version visible, admite sufijo de letras para revisiones pequenas (1.0.0.bs).
-#define MyAppVersion "1.0.0.e"
+#define MyAppVersion "1.0.0.f"
 ; La misma version en cuatro numeros. Windows almacena la version del ejecutable
 ; asi, y un sufijo de letras no es un numero: de ahi que haya dos formas.
-#define MyAppVersionNumeric "1.0.0.5"
+#define MyAppVersionNumeric "1.0.0.6"
 #define MyAppPublisher "Litdemonick"
 #define MyAppAuthor "Litdemonick"
 #define MyAppUrl "https://github.com/Litdemonick/traducy"
@@ -311,6 +311,36 @@ begin
   Result := Result + NewLine + NewLine +
     ExpandConstant('{cm:AboutHeading}') + NewLine + Space +
     ExpandConstant('{cm:AboutProject}');
+end;
+
+{ Deja constancia del idioma elegido en el asistente.
+
+  Es lo que hace que quien instala en ingles abra Traducy en ingles, sin tener que
+  buscar el ajuste. Se escribe un fichero de una linea y no una clave del registro
+  porque todo lo de Traducy vive junto al programa, y porque la aplicacion lo lee
+  una sola vez: en el primer arranque, cuando todavia no hay ajustes guardados.
+  Despues manda lo que el usuario elija en el panel. }
+procedure SaveWizardLanguage();
+var
+  Code: String;
+begin
+  if ActiveLanguage() = 'spanish' then
+    Code := 'es'
+  else
+    Code := 'en';
+  { Si falla no se aborta nada: la aplicacion sabe arrancar sin este fichero,
+    siguiendo el idioma de Windows. }
+  try
+    ForceDirectories(ExpandConstant('{app}\datos'));
+    SaveStringToFile(ExpandConstant('{app}\datos\idioma.txt'), Code, False);
+  except
+  end;
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+begin
+  if CurStep = ssPostInstall then
+    SaveWizardLanguage();
 end;
 
 { ------------------------------------------------------------ desinstalacion }

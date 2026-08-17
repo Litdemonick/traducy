@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../core/failures.dart';
+import '../core/app_paths.dart';
 import '../core/logx.dart';
 import '../core/updater.dart';
 import '../core/version.dart';
@@ -138,7 +139,17 @@ class AppController extends ChangeNotifier {
 
   Future<void> initialize() async {
     try {
+      final bool firstRun = !_store.settingsFileExists;
       _settings = await _store.load();
+      if (firstRun) {
+        // Primer arranque: si el instalador dejó escrito su idioma, se adopta.
+        // Queda guardado como elección explícita, así que el panel lo muestra
+        // seleccionado y se puede cambiar desde ahí.
+        final UiLanguage? chosen = _languageFromInstaller();
+        if (chosen != null) {
+          _settings = _settings.copyWith(uiLanguage: chosen);
+        }
+      }
       // Antes que cualquier otra cosa: el resto del arranque ya genera mensajes
       // que el usuario va a leer en la consola del panel.
       L10n.apply(_settings.uiLanguage);
@@ -170,7 +181,7 @@ class AppController extends ChangeNotifier {
       unawaited(refreshWindowList());
     } catch (e, st) {
       log.e('controller', 'Fallo al inicializar', e, st);
-      _fatalError = 'No se pudo iniciar Traducy: $e';
+      _fatalError = t.panel.msgStartFailed('$e');
       _ready = true;
       notifyListeners();
     }
@@ -277,16 +288,10 @@ class AppController extends ChangeNotifier {
       await windowManager.setSkipTaskbar(false);
       await windowManager.minimize();
       log.i('controller', 'Minimizado. Su botón sigue en la barra de tareas.');
-      toasts.info(
-        'Traducy minimizado',
-        detail: 'Pulsa su botón en la barra de tareas para volver.',
-      );
+      toasts.info(t.minimizedTitle, detail: t.minimizedDetail);
     } catch (e) {
       log.w('controller', 'No se pudo minimizar: $e');
-      toasts.error(
-        'No se pudo minimizar',
-        detail: 'Usa el ojo para pasar a modo juego, o Ctrl+Alt+T.',
-      );
+      toasts.error(t.minimizeFailed, detail: t.minimizeFailedDetail);
       _minimized = false;
       notifyListeners();
       await _applyInteractionMode();
@@ -314,16 +319,10 @@ class AppController extends ChangeNotifier {
         'En segundo plano. Clic en el icono de la bandeja o Ctrl+Alt+T '
             'para recuperarlo.',
       );
-      toasts.info(
-        'Traducy en segundo plano',
-        detail: 'Clic en su icono junto al reloj, o Ctrl+Alt+T, para volver.',
-      );
+      toasts.info(t.backgroundTitle, detail: t.backgroundDetail);
     } catch (e) {
       log.w('controller', 'No se pudo pasar a segundo plano: $e');
-      toasts.error(
-        'No se pudo pasar a segundo plano',
-        detail: 'Usa Ctrl+Alt+T para ocultar el panel mientras juegas.',
-      );
+      toasts.error(t.backgroundFailed, detail: t.backgroundFailedDetail);
       _background = false;
       notifyListeners();
     }
@@ -627,12 +626,10 @@ class AppController extends ChangeNotifier {
     _commit(_settings.copyWith(passthroughInConfig: value));
     unawaited(_applyInteractionMode());
     toasts.info(
-      value
-          ? 'Puedes jugar con el panel abierto'
-          : 'El panel captura los clics',
+      value ? t.panel.msgPassthroughOn : t.panel.msgPassthroughOff,
       detail: value
-          ? 'Los clics pasan al juego salvo sobre el panel y las cajas.'
-          : 'Mientras el panel esté visible, la ventana recibe todos los clics.',
+          ? t.panel.msgPassthroughOnDetail
+          : t.panel.msgPassthroughOffDetail,
     );
   }
 
@@ -641,8 +638,8 @@ class AppController extends ChangeNotifier {
     _subtitlesVisible = visible;
     notifyListeners();
     toasts.info(
-      visible ? 'Subtítulos visibles' : 'Subtítulos ocultos',
-      detail: 'Ctrl+Alt+H para alternar.',
+      visible ? t.panel.msgSubtitlesVisible : t.panel.msgSubtitlesHidden,
+      detail: t.panel.msgToggleWithH,
     );
   }
 
@@ -687,8 +684,8 @@ class AppController extends ChangeNotifier {
   void setRegionToFullScreen() {
     if (_settings.regionLocked) {
       toasts.warning(
-        'La zona está bloqueada',
-        detail: 'Quita el candado de su barra para poder cambiarla.',
+        t.panel.msgZoneLocked,
+        detail: t.panel.msgZoneLockedDetail,
       );
       return;
     }
@@ -712,8 +709,8 @@ class AppController extends ChangeNotifier {
   void setRegionToBottomBand() {
     if (_settings.regionLocked) {
       toasts.warning(
-        'La zona está bloqueada',
-        detail: 'Quita el candado de su barra para poder cambiarla.',
+        t.panel.msgZoneLocked,
+        detail: t.panel.msgZoneLockedDetail,
       );
       return;
     }
@@ -748,23 +745,18 @@ class AppController extends ChangeNotifier {
     }
     _commit(_settings.copyWith(editRegion: editing));
     toasts.info(
-      editing ? 'Zona de captura activada' : 'Zona de captura desactivada',
-      detail: editing
-          ? 'Arrastra su barra de título para moverla y los tiradores del borde '
-                'para redimensionarla.'
-          : 'La zona sigue capturándose; solo se ha ocultado el marco.',
+      editing ? t.panel.msgRegionOn : t.panel.msgRegionOff,
+      detail: editing ? t.panel.msgRegionOnDetail : t.panel.msgRegionOffDetail,
     );
   }
 
   void setEditSubtitleBox(bool editing) {
     _commit(_settings.copyWith(editSubtitleBox: editing));
     toasts.info(
-      editing
-          ? 'Caja de subtítulos activada'
-          : 'Caja de subtítulos desactivada',
+      editing ? t.panel.msgSubtitleBoxOn : t.panel.msgSubtitleBoxOff,
       detail: editing
-          ? 'Mueve la caja por su barra; el interior deja pasar los clics.'
-          : 'El texto traducido se sigue mostrando.',
+          ? t.panel.msgSubtitleBoxOnDetail
+          : t.panel.msgSubtitleBoxOffDetail,
     );
   }
 
@@ -862,7 +854,7 @@ class AppController extends ChangeNotifier {
 
   void resetPanelSize() {
     _commit(_settings.copyWith(panelWidth: 560, panelHeight: 720));
-    toasts.info('Tamaño del panel restablecido');
+    toasts.info(t.panel.msgPanelSizeReset);
   }
 
   void setPanelPosition(Offset position) {
@@ -889,10 +881,8 @@ class AppController extends ChangeNotifier {
   void setRegionLocked(bool locked) {
     _commit(_settings.copyWith(regionLocked: locked));
     toasts.info(
-      locked ? 'Zona de captura bloqueada' : 'Zona de captura desbloqueada',
-      detail: locked
-          ? 'Ya no se puede mover ni redimensionar.'
-          : 'Arrastra su barra de título para moverla.',
+      locked ? t.panel.msgRegionLocked : t.panel.msgRegionUnlocked,
+      detail: locked ? t.panel.msgLockedDetail : t.panel.msgUnlockedDetail,
     );
   }
 
@@ -901,10 +891,8 @@ class AppController extends ChangeNotifier {
   void setSubtitleLocked(bool locked) {
     _commit(_settings.copyWith(subtitleLocked: locked));
     toasts.info(
-      locked ? 'Caja de subtítulos bloqueada' : 'Caja de subtítulos libre',
-      detail: locked
-          ? 'Ya no se puede mover ni redimensionar.'
-          : 'Arrastra su barra de título para moverla.',
+      locked ? t.panel.msgSubtitleLocked : t.panel.msgSubtitleUnlocked,
+      detail: locked ? t.panel.msgLockedDetail : t.panel.msgUnlockedDetail,
     );
   }
 
@@ -955,8 +943,8 @@ class AppController extends ChangeNotifier {
       ),
     );
     toasts.info(
-      'Idioma del juego: ${option.label}',
-      detail: 'Comprobando si el OCR tiene el paquete "${option.ocrCode}"...',
+      t.panel.msgGameLanguage(option.label),
+      detail: t.panel.msgCheckingPack(option.ocrCode),
     );
   }
 
@@ -964,7 +952,7 @@ class AppController extends ChangeNotifier {
     setEngines(
       _settings.engines.copyWith(targetLanguage: option.translateCode),
     );
-    toasts.success('Se traducirá a ${option.label}');
+    toasts.success(t.panel.msgTargetLanguage(option.label));
   }
 
   /// Deja que el traductor detecte el idioma de origen. El OCR sigue
@@ -975,6 +963,24 @@ class AppController extends ChangeNotifier {
         sourceLanguage: auto ? 'auto' : _settings.engines.sourceLanguage,
       ),
     );
+  }
+
+  /// Lee el idioma que dejó escrito el instalador, o `null` si no hay nada.
+  ///
+  /// Cualquier fallo devuelve `null` y el arranque sigue con el idioma del
+  /// sistema: un fichero ilegible no puede impedir que la aplicación abra.
+  UiLanguage? _languageFromInstaller() {
+    try {
+      final File file = AppPaths.instance.installerLanguageFile;
+      if (!file.existsSync()) return null;
+      final String code = file.readAsStringSync().trim().toLowerCase();
+      if (code.startsWith('es')) return UiLanguage.spanish;
+      if (code.startsWith('en')) return UiLanguage.english;
+      return null;
+    } catch (e) {
+      log.d('paths', 'No se pudo leer el idioma del instalador: $e');
+      return null;
+    }
   }
 
   /// Cambia el idioma de la interfaz.
@@ -997,17 +1003,13 @@ class AppController extends ChangeNotifier {
   /// Vacía el historial de subtítulos de la caja.
   void clearSubtitleHistory() {
     _pipeline?.clearHistory();
-    toasts.info('Historial de subtítulos vaciado');
+    toasts.info(t.panel.msgHistoryCleared);
   }
 
   /// Activa o desactiva la actualización automática.
   void setAutoUpdate(bool value) {
     _commit(_settings.copyWith(autoUpdate: value));
-    toasts.info(
-      value
-          ? 'Las versiones nuevas se instalarán solas'
-          : 'Las versiones nuevas esperarán a que pulses Actualizar',
-    );
+    toasts.info(value ? t.panel.msgAutoUpdateOn : t.panel.msgAutoUpdateOff);
   }
 
   void setStartInConfigMode(bool value) =>
@@ -1045,10 +1047,8 @@ class AppController extends ChangeNotifier {
     if (candidate == null) {
       notifyListeners();
       toasts.warning(
-        'No se encontró ninguna ventana de juego',
-        detail:
-            'Abre el juego en modo ventana o sin bordes y vuelve a pulsar '
-            'Detectar el juego.',
+        t.panel.msgNoGameWindow,
+        detail: t.panel.msgNoGameWindowDetail,
       );
       return false;
     }
@@ -1119,15 +1119,13 @@ class AppController extends ChangeNotifier {
     );
     _followConnected = true;
     toasts.success(
-      'Siguiendo a "${window.title}"',
-      detail:
-          'La zona está en la parte baja de esa ventana y se mueve con ella. '
-          'Actívala en Zona si quieres ajustarla.',
+      t.panel.msgFollowing(window.title),
+      detail: t.panel.msgFollowingDetail,
     );
   }
 
   void stopFollowingWindow() {
-    toasts.info('La zona ya no sigue a ninguna ventana');
+    toasts.info(t.panel.msgNotFollowing);
     _followHwnd = 0;
     _followConnected = false;
     _followLossReported = false;
@@ -1178,10 +1176,8 @@ class AppController extends ChangeNotifier {
         _followLossReported = true;
         log.w('controller', 'No se encuentra la ventana "$wanted"');
         toasts.warning(
-          'No encuentro la ventana "$wanted"',
-          detail:
-              'La zona se queda donde estaba. Abre el juego, o pulsa Detectar '
-              'el juego para engancharla a otra ventana.',
+          t.panel.msgWindowLost(wanted),
+          detail: t.panel.msgWindowLostDetail,
         );
       }
       return false;
@@ -1366,10 +1362,10 @@ class AppController extends ChangeNotifier {
   /// que no los necesita.
   Future<void> installOcrLanguage(String language) async {
     if (_download != null) {
-      toasts.warning('Ya hay una descarga en curso');
+      toasts.warning(t.panel.msgDownloadInProgress);
       return;
     }
-    toasts.info('Descargando el idioma "$language"...');
+    toasts.info(t.panel.msgDownloadingLanguage(language));
     _downloadError = null;
     _download = DownloadProgress(
       language: language,
@@ -1390,8 +1386,8 @@ class AppController extends ChangeNotifier {
       _download = null;
       notifyListeners();
       toasts.success(
-        'Idioma "$language" instalado',
-        detail: 'Guardado en $tessdataDirectory',
+        t.panel.msgLanguageInstalled(language),
+        detail: t.panel.msgSavedIn(tessdataDirectory),
       );
       // Los motores se reconstruyen para que el OCR vea el idioma nuevo, y se
       // vuelve a comprobar la salud para que desaparezca el aviso.
@@ -1407,9 +1403,9 @@ class AppController extends ChangeNotifier {
       notifyListeners();
     } catch (e) {
       _download = null;
-      _downloadError = 'Fallo inesperado al descargar "$language": $e';
+      _downloadError = t.panel.msgDownloadUnexpected(language, '$e');
       log.e('controller', 'Fallo inesperado descargando "$language"', e);
-      toasts.error('No se pudo descargar "$language"', detail: '$e');
+      toasts.error(t.panel.msgDownloadFailed(language), detail: '$e');
       notifyListeners();
     } finally {
       installer.dispose();
@@ -1442,7 +1438,7 @@ class AppController extends ChangeNotifier {
   void setTessdataDir(String path) {
     setEngines(_settings.engines.copyWith(tessdataDir: path.trim()));
     unawaited(refreshEngineHealth());
-    toasts.info('Carpeta de idiomas cambiada', detail: tessdataDirectory);
+    toasts.info(t.panel.msgLanguageFolderChanged, detail: tessdataDirectory);
   }
 
   /// Lanza la instalación de Tesseract en una consola visible.
@@ -1463,14 +1459,14 @@ class AppController extends ChangeNotifier {
       );
       log.i('controller', 'Instalación de Tesseract lanzada en PowerShell');
       toasts.info(
-        'Instalación de Tesseract abierta en PowerShell',
-        detail: 'Cuando termine, pulsa "Ya está, comprobar" en el panel.',
+        t.panel.msgTesseractInstallOpened,
+        detail: t.panel.msgTesseractInstallOpenedDetail,
       );
     } catch (e) {
       log.e('controller', 'No se pudo lanzar winget', e);
       toasts.error(
-        'No se pudo abrir el instalador',
-        detail: 'Ejecuta a mano: winget install UB-Mannheim.TesseractOCR',
+        t.panel.msgInstallerFailed,
+        detail: t.panel.msgInstallerFailedDetail,
       );
     }
   }
@@ -1517,21 +1513,21 @@ class AppController extends ChangeNotifier {
   Future<void> checkForUpdate({bool silent = false}) async {
     if (_updateState.isBusy) return;
     _setUpdateState(
-      const UpdateState(
+      UpdateState(
         stage: UpdateStage.checking,
-        message: 'Comprobando si hay una versión nueva...',
+        message: t.panel.msgCheckingNewVersion,
       ),
     );
-    if (!silent) toasts.info('Comprobando actualizaciones...');
+    if (!silent) toasts.info(t.panel.msgCheckingUpdates);
 
     try {
       final ReleaseInfo? release = await _updater.checkForUpdate();
       if (release == null) {
         _setUpdateState(
-          UpdateState(message: 'Estás en la última versión ($appVersion).'),
+          UpdateState(message: t.panel.msgLatestVersion(appVersion)),
         );
         if (!silent) {
-          toasts.success('Ya tienes la última versión', detail: appVersion);
+          toasts.success(t.panel.msgUpToDate, detail: appVersion);
         }
         return;
       }
@@ -1547,16 +1543,14 @@ class AppController extends ChangeNotifier {
         UpdateState(
           stage: UpdateStage.available,
           release: release,
-          message: 'Versión ${release.version} disponible.',
+          message: t.panel.msgVersionAvailable(release.version),
         ),
       );
       toasts.warning(
-        'Hay una versión nueva: ${release.version}',
+        t.panel.msgNewVersion(release.version),
         detail: _settings.autoUpdate
-            ? 'Traducy se ha detenido y se está actualizando solo '
-                  '(${release.readableSize}).'
-            : 'Traducy se ha detenido y quedará bloqueado hasta actualizar '
-                  '(${release.readableSize}).',
+            ? t.panel.msgNewVersionAuto(release.readableSize)
+            : t.panel.msgNewVersionManual(release.readableSize),
       );
 
       // Con la actualización automática no hay nada que pulsar: se descarga y se
@@ -1575,7 +1569,10 @@ class AppController extends ChangeNotifier {
       }
     } catch (e) {
       _setUpdateState(
-        UpdateState(stage: UpdateStage.failed, message: 'Fallo inesperado: $e'),
+        UpdateState(
+          stage: UpdateStage.failed,
+          message: t.panel.msgUnexpectedError('$e'),
+        ),
       );
       log.e('updater', 'Fallo inesperado comprobando actualizaciones', e);
     }
@@ -1598,7 +1595,7 @@ class AppController extends ChangeNotifier {
         stage: UpdateStage.downloading,
         release: release,
         totalBytes: release.sizeBytes,
-        message: 'Descargando la versión ${release.version}...',
+        message: t.panel.msgDownloadingVersion(release.version),
       ),
     );
 
@@ -1612,7 +1609,7 @@ class AppController extends ChangeNotifier {
               release: release,
               receivedBytes: received,
               totalBytes: total,
-              message: 'Descargando la versión ${release.version}...',
+              message: t.panel.msgDownloadingVersion(release.version),
             ),
           );
         },
@@ -1622,9 +1619,7 @@ class AppController extends ChangeNotifier {
         UpdateState(
           stage: UpdateStage.ready,
           release: release,
-          message:
-              'Instalando la versión ${release.version}. '
-              'Traducy se cerrará y volverá a abrirse.',
+          message: t.panel.msgInstallingVersion(release.version),
         ),
       );
 
@@ -1654,7 +1649,7 @@ class AppController extends ChangeNotifier {
           message: 'Fallo inesperado: $e',
         ),
       );
-      toasts.error('No se pudo actualizar', detail: '$e');
+      toasts.error(t.panel.msgUpdateFailed, detail: '$e');
     }
   }
 
@@ -1682,8 +1677,8 @@ class AppController extends ChangeNotifier {
       final String? exe = await probe.resolveExecutable();
       if (exe == null) {
         toasts.error(
-          'No se encuentra Tesseract en este equipo',
-          detail: 'Pulsa "Instalar Tesseract" en la guía de arriba.',
+          t.panel.msgTesseractNotFound,
+          detail: t.panel.msgTesseractNotFoundDetail,
         );
         return;
       }
@@ -1691,7 +1686,7 @@ class AppController extends ChangeNotifier {
       // Ruta encontrada por autodetección: se guarda para no repetir la búsqueda
       // en cada arranque, y para que el usuario vea de dónde sale.
       if (_settings.engines.tesseractPath.trim().isEmpty) {
-        toasts.info('Tesseract detectado', detail: exe);
+        toasts.info(t.panel.msgTesseractFound, detail: exe);
       }
 
       final List<String> available = await probe.availableLanguages();
@@ -1699,8 +1694,8 @@ class AppController extends ChangeNotifier {
 
       if (missing.isEmpty) {
         toasts.success(
-          'Todo listo: OCR "${_settings.engines.ocrLanguages}" disponible',
-          detail: 'Idiomas instalados: ${available.join(', ')}',
+          t.panel.msgOcrReady(_settings.engines.ocrLanguages),
+          detail: t.panel.msgInstalledLanguages(available.join(', ')),
         );
         return;
       }
@@ -1711,11 +1706,10 @@ class AppController extends ChangeNotifier {
           .where((String l) => l != 'osd')
           .toList();
       toasts.warning(
-        'Falta el idioma "${missing.join(', ')}" del OCR',
+        t.panel.msgMissingOcrLanguage(missing.join(', ')),
         detail: usable.isEmpty
-            ? 'Descárgalo desde la guía de arriba.'
-            : 'Puedes descargarlo desde la guía, o usar uno de los que ya '
-                  'tienes: ${usable.join(', ')}.',
+            ? t.panel.msgDownloadFromGuide
+            : t.panel.msgOrUseInstalled(usable.join(', ')),
       );
     } catch (e) {
       log.w('controller', 'Autodetección incompleta: $e');
@@ -1739,8 +1733,8 @@ class AppController extends ChangeNotifier {
     if (windowsOcrAvailable && windowsOcrCoversRequest) return;
 
     final String reason = windowsOcrAvailable
-        ? 'Windows no tiene instalado el idioma que hace falta'
-        : 'este Windows no trae el componente de OCR';
+        ? t.panel.msgReasonNoLanguage
+        : t.panel.msgReasonNoComponent;
     _commit(
       _settings.copyWith(
         engines: _settings.engines.copyWith(ocrKind: OcrKind.tesseract),
@@ -1749,10 +1743,8 @@ class AppController extends ChangeNotifier {
     );
     log.i('controller', 'Se usa Tesseract porque $reason');
     toasts.info(
-      'Se usará Tesseract para leer la pantalla',
-      detail:
-          'El OCR de Windows no sirve aquí: $reason. Puedes volver a intentarlo '
-          'desde la pestaña Idiomas cuando lo añadas.',
+      t.panel.msgFallbackToTesseract,
+      detail: t.panel.msgFallbackToTesseractDetail(reason),
     );
   }
 
@@ -1769,24 +1761,23 @@ class AppController extends ChangeNotifier {
 
     if (_windowsOcrLanguages.isEmpty) {
       toasts.warning(
-        'Este Windows no trae el componente de OCR',
-        detail: 'Cambia a Tesseract en la pestana Idiomas.',
+        t.panel.msgNoOcrComponent,
+        detail: t.panel.msgSwitchToTesseract,
       );
       return;
     }
     if (!windowsOcrCoversRequest) {
       toasts.warning(
-        'Windows no reconoce "${_settings.engines.ocrLanguages}"',
-        detail:
-            'Reconoce: ${_windowsOcrLanguages.join(', ')}. Usa Tesseract para '
-            'este idioma: se descarga dentro de Traducy y no cambia nada de tu '
-            'Windows.',
+        t.panel.msgWindowsCannotRead(_settings.engines.ocrLanguages),
+        detail: t.panel.msgWindowsCannotReadDetail(
+          _windowsOcrLanguages.join(', '),
+        ),
       );
       return;
     }
     toasts.success(
-      'OCR de Windows listo ($windowsOcrEffectiveTag)',
-      detail: 'Sin instalar nada y sin salir del equipo.',
+      t.panel.msgWindowsOcrReady(windowsOcrEffectiveTag),
+      detail: t.panel.msgWindowsOcrReadyDetail,
     );
   }
 
@@ -1814,7 +1805,7 @@ class AppController extends ChangeNotifier {
       }
     } catch (e) {
       _ocrHealth = EngineHealth(
-        issue: 'Fallo al comprobar el OCR: $e',
+        issue: t.panel.msgOcrCheckFailed('$e'),
         checkedAt: DateTime.now(),
       );
     } finally {
@@ -1836,7 +1827,7 @@ class AppController extends ChangeNotifier {
       _translatorHealth = EngineHealth(issue: issue, checkedAt: DateTime.now());
     } catch (e) {
       _translatorHealth = EngineHealth(
-        issue: 'Fallo al comprobar el traductor: $e',
+        issue: t.panel.msgTranslatorCheckFailed('$e'),
         checkedAt: DateTime.now(),
       );
     } finally {
@@ -1859,28 +1850,28 @@ class AppController extends ChangeNotifier {
 
   void startTranslating() {
     if (_ocrHealth.hasProblem) {
-      toasts.error('No se puede traducir todavía', detail: _ocrHealth.issue);
+      toasts.error(t.panel.msgCannotTranslateYet, detail: _ocrHealth.issue);
       return;
     }
     if (!resolveCaptureRegion().isValid) {
       setRegionToBottomBand();
       toasts.info(
-        'Se ha puesto una zona en la banda inferior',
-        detail: 'Ajústala si el texto del juego aparece en otro sitio.',
+        t.panel.msgBottomBandSet,
+        detail: t.panel.msgBottomBandSetDetail,
       );
     }
     _pipeline?.start();
     notifyListeners();
     toasts.success(
-      'Traduciendo',
-      detail: 'Ctrl+Alt+T oculta el panel · Ctrl+Alt+P pausa',
+      t.panel.msgTranslating,
+      detail: t.panel.msgTranslatingDetail,
     );
   }
 
   void stopTranslating() {
     _pipeline?.stop();
     notifyListeners();
-    toasts.info('Traducción detenida');
+    toasts.info(t.panel.msgTranslationStopped);
   }
 
   void togglePause() {
@@ -1889,25 +1880,28 @@ class AppController extends ChangeNotifier {
     pipeline.toggle();
     notifyListeners();
     toasts.info(
-      pipeline.isRunning ? 'Traducción reanudada' : 'Traducción en pausa',
-      detail: 'Ctrl+Alt+P para alternar.',
+      pipeline.isRunning
+          ? t.panel.msgTranslationResumed
+          : t.panel.msgTranslationPaused,
+      detail: t.panel.msgToggleWithP,
     );
   }
 
   Future<void> testOnce() async {
-    toasts.info('Probando una captura...');
+    toasts.info(t.panel.msgTestingCapture);
     await _pipeline?.runOnce();
     notifyListeners();
     final PipelineStatus? status = _pipeline?.status.value;
     if (status == null) return;
     if (status.failedStage != null) {
-      toasts.error('La prueba falló: ${status.message}', detail: status.hint);
+      toasts.error(t.panel.msgTestFailed(status.message), detail: status.hint);
     } else {
       toasts.success(
-        'Prueba completada: ${status.message}',
-        detail:
-            'OCR ${status.lastOcrMs} ms · traducción '
-            '${status.lastTranslateMs} ms',
+        t.panel.msgTestDone(status.message),
+        detail: t.panel.msgTestTimings(
+          status.lastOcrMs,
+          status.lastTranslateMs,
+        ),
       );
     }
   }

@@ -48,7 +48,7 @@ idioma sin traducción oficial.
 |---|---|
 | [Cómo funciona](#cómo-funciona) · [Requisitos](#requisitos) · [Primeros pasos](#primeros-pasos) | Empezar |
 | [El overlay no te bloquea el ratón](#el-overlay-no-te-bloquea-el-ratón) · [Minimizar y modo juego](#minimizar-y-modo-juego) · [Atajos globales](#atajos-globales) · [La caja de subtítulos](#la-caja-de-subtítulos) · [Los dos candados](#los-dos-candados) | Uso diario |
-| [Motores de traducción](#motores-de-traducción) · [Ajustar la precisión del OCR](#ajustar-la-precisión-del-ocr) · [Problemas frecuentes](#problemas-frecuentes) | Afinar |
+| [Idioma de la aplicación](#idioma-de-la-aplicación) · [Motores de traducción](#motores-de-traducción) · [Ajustar la precisión del OCR](#ajustar-la-precisión-del-ocr) · [Problemas frecuentes](#problemas-frecuentes) | Afinar |
 | [Compilar y ejecutar](#compilar-y-ejecutar) · [Estructura del código](#estructura-del-código) · [Pruebas](#pruebas) | Desarrollo |
 | [Crear el instalador](#crear-el-instalador-para-compartir) · [Versiones](#versiones) · [Actualizaciones automáticas](#actualizaciones-automáticas) | Publicar |
 
@@ -162,6 +162,21 @@ En el icono de la bandeja:
 - **Clic izquierdo**: recupera la ventana y abre el panel de control.
 - **Clic derecho**: menú con abrir, pausar o reanudar la traducción, mostrar u
   ocultar los subtítulos, y salir.
+
+## Idioma de la aplicación
+
+Traducy se ve en **español o inglés**, y es independiente del idioma al que
+traduce el juego. Se elige en **Idiomas → Idioma de la aplicación**:
+
+| Opción | Qué hace |
+|---|---|
+| **Automático** | Sigue a Windows: español si el sistema está en español, inglés en cualquier otro caso. |
+| **Español** / **Inglés** | Fijo, sin mirar el sistema. |
+
+> [!TIP]
+> El instalador deja escrito el idioma de su asistente, así que quien instala en
+> inglés abre Traducy en inglés sin tener que buscar el ajuste. A partir de ahí
+> manda lo que elijas en el panel.
 
 ## Atajos globales
 
