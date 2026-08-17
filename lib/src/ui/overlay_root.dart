@@ -93,7 +93,8 @@ class _OverlayRootState extends State<OverlayRoot> {
 
     // El panel solo cuenta si está a la vista; los marcos, siempre que estén
     // activados, aunque el panel esté oculto.
-    final BuildContext? panelContext = controller.configMode
+    final BuildContext? panelContext =
+        controller.configMode || controller.updateRequired
         ? _panelKey.currentContext
         : null;
     if (panelContext != null) {
@@ -190,7 +191,37 @@ class _OverlayRootState extends State<OverlayRoot> {
                 if (settings.editRegion)
                   _RegionOverlay(controller: controller, bounds: logicalSize),
                 _SubtitleLayer(controller: controller, bounds: logicalSize),
-                if (controller.configMode)
+                // Con una actualizacion pendiente se bloquea el trabajo: una
+                // version vieja a medias parece un fallo de la aplicacion, y
+                // durante la instalacion este mismo ejecutable va a ser
+                // sustituido.
+                //
+                // El aviso ocupa el hueco del panel y lo sustituye, en lugar de
+                // cubrir la pantalla entera. Dentro del panel es donde el
+                // usuario espera leer las cosas, y ademas su rectangulo ya
+                // recibe el raton: cubriendo todo, el boton de actualizar
+                // quedaba fuera de las zonas que el overlay entrega y no habia
+                // forma de pulsarlo.
+                if (controller.updateRequired)
+                  Positioned(
+                    left: settings.panelX,
+                    top: settings.panelY,
+                    child: RepaintBoundary(
+                      child: Container(
+                        key: _panelKey,
+                        child: UpdateBlockingScreen(
+                          state: controller.updateState,
+                          onInstall: controller.onRequestUpdateInstall,
+                          onRetry: controller.retryUpdate,
+                          onExit: widget.onExit,
+                          releasesPageUrl: controller.releasesPageUrl,
+                          width: settings.panelWidth,
+                          automatic: settings.autoUpdate,
+                        ),
+                      ),
+                    ),
+                  )
+                else if (controller.configMode)
                   Positioned(
                     left: settings.panelX,
                     top: settings.panelY,
@@ -206,19 +237,8 @@ class _OverlayRootState extends State<OverlayRoot> {
                       ),
                     ),
                   ),
-                if (!controller.configMode)
+                if (!controller.configMode && !controller.updateRequired)
                   _LiveIndicator(controller: controller, bounds: logicalSize),
-                // Con una actualizacion pendiente se bloquea todo: una version
-                // vieja a medias parece un fallo de la aplicacion, y durante la
-                // instalacion este mismo ejecutable va a ser sustituido.
-                if (controller.updateRequired)
-                  UpdateBlockingScreen(
-                    state: controller.updateState,
-                    onInstall: controller.onRequestUpdateInstall,
-                    onRetry: controller.retryUpdate,
-                    onExit: widget.onExit,
-                    releasesPageUrl: controller.releasesPageUrl,
-                  ),
               ],
             );
           },

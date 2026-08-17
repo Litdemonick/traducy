@@ -83,23 +83,30 @@ Tres decisiones sostienen el rendimiento:
 - **Windows 10 versión 2004 o posterior.** En versiones anteriores funciona, pero
   el overlay no puede excluirse de su propia captura y hay que mantener los
   subtítulos fuera de la zona de lectura.
-- **Tesseract OCR.** Es el único requisito externo:
+- **Un motor de OCR.** Hay dos y se eligen en la pestaña **Idiomas**:
+
+| Motor | Coste | Notas |
+|---|---|---|
+| **OCR de Windows** (por defecto) | Gratis | Viene con el sistema. Sin clave, sin internet, nada que instalar, y acierta más sobre capturas de pantalla, sobre todo en japonés. Necesita el **paquete de idioma** añadido en Windows. |
+| **Tesseract** | Gratis | Funciona en cualquier equipo y trae sus propios paquetes de idioma, que Traducy descarga desde el panel sin permisos de administrador. |
+
+Para el de Windows, añade el idioma en **Configuración → Hora e idioma → Idioma
+y región → Agregar idioma**. El componente de OCR llega con el paquete.
+
+Para Tesseract:
 
 ```powershell
 winget install UB-Mannheim.TesseractOCR
 ```
 
-Durante su instalación, en la pantalla de componentes, marca los **idiomas
-adicionales** que vayas a leer (Japanese, Chinese, Korean…).
-
 > [!TIP]
-> Si ya lo tienes instalado sin esos idiomas, no hace falta reinstalar nada:
-> Traducy los descarga desde la pestaña **Idiomas** con un botón, en su propia
-> carpeta y sin pedir permisos de administrador.
+> Traducy elige solo. Si arranca con el motor de Windows y resulta que falta el
+> componente o el idioma, se pasa a Tesseract y lo dice en la consola del panel,
+> en lugar de quedarse sin traducir con un aviso que hay que ir a buscar.
 
-Traducy detecta Tesseract solo: en el `PATH`, en las rutas de instalación
-habituales, o en una carpeta `tesseract\` junto al ejecutable. Si no lo
-encuentra, la ruta se puede indicar a mano en **Diagnóstico**.
+Tesseract se detecta en el `PATH`, en las rutas de instalación habituales, o en
+una carpeta `tesseract\` junto al ejecutable. Si no aparece, la ruta se puede
+indicar a mano en **Diagnóstico**.
 
 ## Primeros pasos
 
@@ -392,6 +399,13 @@ versión nueva:
 2. Pulsando **Actualizar ahora** descarga el instalador mostrando el progreso.
 3. Vuelca los ajustes a disco, lanza el instalador y se cierra. El instalador
    sustituye la versión anterior en la misma carpeta y vuelve a abrir Traducy.
+
+Con **Actualizar automáticamente** (activado por defecto, en Diagnóstico) los
+pasos 2 y 3 van solos: no hay nada que pulsar. Desactivándolo, el aviso espera.
+
+El aviso ocupa el hueco del panel de control, no la pantalla entera: además de no
+tapar el escritorio, es donde el overlay entrega el ratón, así que el botón se
+puede pulsar.
 
 La pantalla de bloqueo **siempre ofrece salir**, y si la descarga falla ofrece
 reintentar y enseña la dirección para bajarla a mano: un fallo de red no debe

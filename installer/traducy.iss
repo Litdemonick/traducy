@@ -13,10 +13,10 @@
 
 #define MyAppName "Traducy"
 ; Version visible, admite sufijo de letras para revisiones pequenas (1.0.0.bs).
-#define MyAppVersion "1.0.0.d"
+#define MyAppVersion "1.0.0.e"
 ; La misma version en cuatro numeros. Windows almacena la version del ejecutable
 ; asi, y un sufijo de letras no es un numero: de ahi que haya dos formas.
-#define MyAppVersionNumeric "1.0.0.4"
+#define MyAppVersionNumeric "1.0.0.5"
 #define MyAppPublisher "Litdemonick"
 #define MyAppAuthor "Litdemonick"
 #define MyAppUrl "https://github.com/Litdemonick/traducy"

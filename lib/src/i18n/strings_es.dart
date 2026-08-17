@@ -160,6 +160,21 @@ class StringsEs extends AppStrings {
   String get updateFailedTitle => 'No se pudo actualizar';
 
   @override
+  String get updateAutomaticNotice =>
+      'Se esta instalando sola. Puedes desactivar la actualizacion automatica en Diagnostico.';
+
+  @override
+  String get autoUpdateLabel => 'Actualizar automaticamente';
+
+  @override
+  String get autoUpdateOn =>
+      'Las versiones nuevas se descargan e instalan solas.';
+
+  @override
+  String get autoUpdateOff =>
+      'Las versiones nuevas esperan a que pulses Actualizar.';
+
+  @override
   String get checkingUpdates => 'Comprobando actualizaciones';
 
   @override

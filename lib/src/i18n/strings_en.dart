@@ -157,6 +157,19 @@ class StringsEn extends AppStrings {
   String get updateFailedTitle => 'The update failed';
 
   @override
+  String get updateAutomaticNotice =>
+      'It is installing itself. You can turn automatic updates off in Diagnostics.';
+
+  @override
+  String get autoUpdateLabel => 'Update automatically';
+
+  @override
+  String get autoUpdateOn => 'New versions download and install by themselves.';
+
+  @override
+  String get autoUpdateOff => 'New versions wait until you press Update.';
+
+  @override
   String get checkingUpdates => 'Checking for updates';
 
   @override

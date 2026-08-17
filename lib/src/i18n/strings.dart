@@ -94,6 +94,10 @@ abstract class AppStrings {
   String get installingUpdate;
   String get installingDetail;
   String get updateFailedTitle;
+  String get updateAutomaticNotice;
+  String get autoUpdateLabel;
+  String get autoUpdateOn;
+  String get autoUpdateOff;
   String updateManualFrom(String url);
   String get checkingUpdates;
 

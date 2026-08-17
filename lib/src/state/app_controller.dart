@@ -18,6 +18,7 @@ import '../native/screen_capture.dart';
 import '../ocr/ocr_engine.dart';
 import '../ocr/tessdata_installer.dart';
 import '../ocr/tesseract_ocr.dart';
+import '../ocr/windows_ocr.dart';
 import '../pipeline/pipeline.dart';
 import '../translate/http_translators.dart';
 import '../translate/translator.dart';
@@ -135,6 +136,8 @@ class AppController extends ChangeNotifier {
       // que el usuario va a leer en la consola del panel.
       L10n.apply(_settings.uiLanguage);
       _configMode = _settings.startInConfigMode;
+
+      await _pickWorkingOcrEngine();
 
       await _positionWindowOverVirtualScreen();
       _overlay.applyOverlayStyles();
@@ -328,6 +331,8 @@ class AppController extends ChangeNotifier {
       await windowManager.show();
       // Al volver se reafirma la geometría y los estilos: mientras estaba
       // oculta pueden haber cambiado la resolución o el número de monitores.
+      await _pickWorkingOcrEngine();
+
       await _positionWindowOverVirtualScreen();
       _overlay.applyOverlayStyles();
       _overlay.excludeFromCapture(true);
@@ -850,7 +855,8 @@ class AppController extends ChangeNotifier {
         previous.glossary != engines.glossary ||
         previous.tesseractPath != engines.tesseractPath ||
         previous.ocrLanguages != engines.ocrLanguages ||
-        previous.psm != engines.psm;
+        previous.psm != engines.psm ||
+        previous.ocrKind != engines.ocrKind;
     _commit(_settings.copyWith(engines: engines), rebuildEngines: needsRebuild);
     if (needsRebuild) unawaited(refreshEngineHealth());
   }
@@ -927,6 +933,16 @@ class AppController extends ChangeNotifier {
   void clearSubtitleHistory() {
     _pipeline?.clearHistory();
     toasts.info('Historial de subtítulos vaciado');
+  }
+
+  /// Activa o desactiva la actualización automática.
+  void setAutoUpdate(bool value) {
+    _commit(_settings.copyWith(autoUpdate: value));
+    toasts.info(
+      value
+          ? 'Las versiones nuevas se instalarán solas'
+          : 'Las versiones nuevas esperarán a que pulses Actualizar',
+    );
   }
 
   void setStartInConfigMode(bool value) =>
@@ -1069,12 +1085,56 @@ class AppController extends ChangeNotifier {
 
   // -------------------------------------------------------------- motores
 
-  OcrEngine _createOcrEngine() => TesseractOcr(
-    executablePath: _settings.engines.tesseractPath,
-    languages: _settings.engines.ocrLanguages,
-    psm: _settings.engines.psm,
-    userTessdataDir: tessdataDirectory,
+  OcrEngine _createOcrEngine() {
+    if (_settings.engines.ocrKind == OcrKind.windows) {
+      return WindowsOcr(
+        languageTag: WindowsOcr.tagForTesseractCode(
+          _settings.engines.ocrLanguages,
+        ),
+      );
+    }
+    return TesseractOcr(
+      executablePath: _settings.engines.tesseractPath,
+      languages: _settings.engines.ocrLanguages,
+      psm: _settings.engines.psm,
+      userTessdataDir: tessdataDirectory,
+    );
+  }
+
+  /// Idiomas que el OCR de Windows puede reconocer en este equipo.
+  ///
+  /// Se consulta una vez y se guarda: la lista depende de los paquetes de idioma
+  /// instalados, que no cambian mientras la aplicacion esta abierta.
+  List<String> _windowsOcrLanguages = const <String>[];
+
+  List<String> get windowsOcrLanguages => _windowsOcrLanguages;
+
+  /// `true` si el motor de Windows esta disponible en este equipo.
+  bool get windowsOcrAvailable => _windowsOcrLanguages.isNotEmpty;
+
+  /// `true` si el motor de Windows tiene el idioma que se ha pedido.
+  bool get windowsOcrCoversRequest => WindowsOcr.covers(
+    _windowsOcrLanguages,
+    WindowsOcr.tagForTesseractCode(_settings.engines.ocrLanguages),
   );
+
+  /// Cambia de motor de OCR y lo reinicia.
+  Future<void> setOcrKind(OcrKind kind) async {
+    if (_settings.engines.ocrKind == kind) return;
+    _commit(
+      _settings.copyWith(engines: _settings.engines.copyWith(ocrKind: kind)),
+      rebuildEngines: true,
+    );
+    await refreshEngineHealth();
+    toasts.info(
+      kind == OcrKind.windows
+          ? 'Motor de OCR: el de Windows'
+          : 'Motor de OCR: Tesseract',
+      detail: kind == OcrKind.windows
+          ? 'Gratis y sin instalar nada. Necesita el idioma en Windows.'
+          : 'Funciona en cualquier equipo con sus propios paquetes de idioma.',
+    );
+  }
 
   Translator _createTranslator() {
     final EngineSettings e = _settings.engines;
@@ -1335,10 +1395,18 @@ class AppController extends ChangeNotifier {
       );
       toasts.warning(
         'Hay una versión nueva: ${release.version}',
-        detail:
-            'Traducy se ha detenido y quedará bloqueado hasta actualizar '
-            '(${release.readableSize}).',
+        detail: _settings.autoUpdate
+            ? 'Traducy se ha detenido y se está actualizando solo '
+                  '(${release.readableSize}).'
+            : 'Traducy se ha detenido y quedará bloqueado hasta actualizar '
+                  '(${release.readableSize}).',
       );
+
+      // Con la actualización automática no hay nada que pulsar: se descarga y se
+      // instala sola. El bloqueo sigue estando, pero informa en lugar de esperar.
+      if (_settings.autoUpdate) {
+        await onRequestUpdateInstall();
+      }
     } on StageFailure catch (failure) {
       _setUpdateState(
         UpdateState(stage: UpdateStage.failed, message: failure.message),
@@ -1488,6 +1556,38 @@ class AppController extends ChangeNotifier {
     }
   }
 
+  /// Elige el motor de OCR que de verdad funciona en este equipo.
+  ///
+  /// El de Windows viene por defecto porque es gratis y acierta mas, pero
+  /// depende de un componente y de un paquete de idioma que no todos tienen. Si
+  /// falta cualquiera de los dos, se pasa a Tesseract y se explica en la consola,
+  /// en lugar de dejar la aplicacion sin traducir con un aviso que hay que ir a
+  /// buscar. Solo ocurre en el arranque y solo hacia Tesseract: si el usuario
+  /// elige un motor a mano, se respeta.
+  Future<void> _pickWorkingOcrEngine() async {
+    if (_settings.engines.ocrKind != OcrKind.windows) return;
+
+    _windowsOcrLanguages = await WindowsOcr.systemLanguages();
+    if (windowsOcrAvailable && windowsOcrCoversRequest) return;
+
+    final String reason = windowsOcrAvailable
+        ? 'Windows no tiene instalado el idioma que hace falta'
+        : 'este Windows no trae el componente de OCR';
+    _commit(
+      _settings.copyWith(
+        engines: _settings.engines.copyWith(ocrKind: OcrKind.tesseract),
+      ),
+      rebuildEngines: true,
+    );
+    log.i('controller', 'Se usa Tesseract porque $reason');
+    toasts.info(
+      'Se usará Tesseract para leer la pantalla',
+      detail:
+          'El OCR de Windows no sirve aquí: $reason. Puedes volver a intentarlo '
+          'desde la pestaña Idiomas cuando lo añadas.',
+    );
+  }
+
   Future<void> refreshEngineHealth() async {
     _ocrHealth = const EngineHealth(checking: true);
     _translatorHealth = const EngineHealth(checking: true);
@@ -1497,6 +1597,9 @@ class AppController extends ChangeNotifier {
     try {
       final String? issue = await ocr.checkAvailability();
       _ocrHealth = EngineHealth(issue: issue, checkedAt: DateTime.now());
+      if (ocr is WindowsOcr) {
+        _windowsOcrLanguages = await WindowsOcr.systemLanguages();
+      }
       if (ocr is TesseractOcr) {
         // Sistema + descargados: si solo se contase el sistema, un idioma
         // bajado por la app saldría como "no instalado" en el desplegable.

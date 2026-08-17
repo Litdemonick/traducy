@@ -14,6 +14,19 @@ enum TransparencyMode {
 
 enum TranslatorKind { none, googleFree, libre, deepl, claude }
 
+/// Motor que lee el texto de la imagen.
+enum OcrKind {
+  /// El que trae Windows (`Windows.Media.Ocr`). Gratis, sin clave, sin internet
+  /// y mejor que Tesseract sobre capturas de pantalla, sobre todo en japones,
+  /// chino y coreano. Necesita el paquete de idioma instalado en Windows.
+  windows,
+
+  /// Tesseract como proceso aparte. Funciona en cualquier equipo y trae sus
+  /// propios paquetes de idioma, que Traducy puede descargar sin permisos de
+  /// administrador.
+  tesseract,
+}
+
 /// Cómo se decide la región que se captura.
 enum RegionMode {
   /// Rectángulo fijo en coordenadas de pantalla.
@@ -485,6 +498,7 @@ class EngineSettings {
     this.tesseractPath = '',
     this.ocrLanguages = 'eng',
     this.psm = 6,
+    this.ocrKind = OcrKind.windows,
     this.translator = TranslatorKind.googleFree,
     this.targetLanguage = 'es',
     this.sourceLanguage = 'auto',
@@ -505,6 +519,11 @@ class EngineSettings {
   /// Page Segmentation Mode de Tesseract. 6 = bloque uniforme de texto, que es
   /// lo correcto para una caja de diálogo. 7 = una sola línea.
   final int psm;
+
+  /// Motor de OCR. Por defecto el de Windows: es gratis, no hay nada que
+  /// instalar y acierta mas. Si el idioma no esta en el sistema, la interfaz lo
+  /// dice y Tesseract sigue estando a un clic.
+  final OcrKind ocrKind;
 
   final TranslatorKind translator;
   final String targetLanguage;
@@ -529,6 +548,7 @@ class EngineSettings {
     String? tesseractPath,
     String? ocrLanguages,
     int? psm,
+    OcrKind? ocrKind,
     TranslatorKind? translator,
     String? targetLanguage,
     String? sourceLanguage,
@@ -542,6 +562,7 @@ class EngineSettings {
     tesseractPath: tesseractPath ?? this.tesseractPath,
     ocrLanguages: ocrLanguages ?? this.ocrLanguages,
     psm: psm ?? this.psm,
+    ocrKind: ocrKind ?? this.ocrKind,
     translator: translator ?? this.translator,
     targetLanguage: targetLanguage ?? this.targetLanguage,
     sourceLanguage: sourceLanguage ?? this.sourceLanguage,
@@ -557,6 +578,7 @@ class EngineSettings {
     'tesseractPath': tesseractPath,
     'ocrLanguages': ocrLanguages,
     'psm': psm,
+    'ocrKind': ocrKind.name,
     'translator': translator.name,
     'targetLanguage': targetLanguage,
     'sourceLanguage': sourceLanguage,
@@ -572,6 +594,7 @@ class EngineSettings {
     tesseractPath: _asString(json['tesseractPath'], ''),
     ocrLanguages: _asString(json['ocrLanguages'], 'eng'),
     psm: _asInt(json['psm'], 6).clamp(0, 13),
+    ocrKind: _asEnum(json['ocrKind'], OcrKind.values, OcrKind.windows),
     translator: _asEnum(
       json['translator'],
       TranslatorKind.values,
@@ -613,6 +636,7 @@ class AppSettings {
     this.engines = const EngineSettings(),
     this.transparency = TransparencyMode.compositor,
     this.uiLanguage = UiLanguage.auto,
+    this.autoUpdate = true,
     this.colorKey = 0xFF00FF,
     this.startInConfigMode = true,
     this.passthroughInConfig = true,
@@ -677,6 +701,13 @@ class AppSettings {
   /// Idioma en el que se ve la aplicación. Distinto del idioma al que se
   /// traduce: ese vive en [EngineSettings.targetLanguage].
   final UiLanguage uiLanguage;
+
+  /// Instalar las versiones nuevas sin esperar a que el usuario pulse nada.
+  ///
+  /// Activado por defecto. Traducy se bloquea igualmente al detectar una versión
+  /// nueva, así que sin esto el bloqueo se queda esperando un clic: prefiero que
+  /// la actualización siga sola y que quien no la quiera la desactive.
+  final bool autoUpdate;
   final int colorKey;
   final bool startInConfigMode;
 
@@ -711,6 +742,7 @@ class AppSettings {
     EngineSettings? engines,
     TransparencyMode? transparency,
     UiLanguage? uiLanguage,
+    bool? autoUpdate,
     int? colorKey,
     bool? startInConfigMode,
     bool? passthroughInConfig,
@@ -736,6 +768,7 @@ class AppSettings {
     engines: engines ?? this.engines,
     transparency: transparency ?? this.transparency,
     uiLanguage: uiLanguage ?? this.uiLanguage,
+    autoUpdate: autoUpdate ?? this.autoUpdate,
     colorKey: colorKey ?? this.colorKey,
     startInConfigMode: startInConfigMode ?? this.startInConfigMode,
     passthroughInConfig: passthroughInConfig ?? this.passthroughInConfig,
@@ -764,6 +797,7 @@ class AppSettings {
     'engines': engines.toJson(),
     'transparency': transparency.name,
     'uiLanguage': uiLanguage.name,
+    'autoUpdate': autoUpdate,
     'colorKey': colorKey,
     'startInConfigMode': startInConfigMode,
     'passthroughInConfig': passthroughInConfig,
@@ -808,6 +842,7 @@ class AppSettings {
       TransparencyMode.compositor,
     ),
     uiLanguage: _asEnum(json['uiLanguage'], UiLanguage.values, UiLanguage.auto),
+    autoUpdate: _asBool(json['autoUpdate'], true),
     colorKey: _asInt(json['colorKey'], 0xFF00FF),
     startInConfigMode: _asBool(json['startInConfigMode'], true),
     passthroughInConfig: _asBool(json['passthroughInConfig'], true),

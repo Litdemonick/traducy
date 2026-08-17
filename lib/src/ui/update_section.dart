@@ -58,6 +58,14 @@ class UpdateSection extends StatelessWidget {
           ],
         ),
         HelpText(t.updateBlockExplanation),
+        SwitchRow(
+          label: t.autoUpdateLabel,
+          subtitle: controller.settings.autoUpdate
+              ? t.autoUpdateOn
+              : t.autoUpdateOff,
+          value: controller.settings.autoUpdate,
+          onChanged: controller.setAutoUpdate,
+        ),
 
         if (state.stage == UpdateStage.checking)
           const Padding(
@@ -113,7 +121,13 @@ class UpdateSection extends StatelessWidget {
   }
 }
 
-/// Pantalla que cubre todo mientras hay una actualización pendiente.
+/// Aviso que bloquea el trabajo mientras hay una actualización pendiente.
+///
+/// Vive **dentro del panel de control**, en su sitio y con su ancho. Antes cubría
+/// la pantalla entera: además de tapar el escritorio, el botón de actualizar no
+/// se podía pulsar, porque el overlay solo entrega el ratón en los rectángulos
+/// que publica y ese cartel no era uno de ellos. Ocupando el hueco del panel, el
+/// rectángulo ya está publicado y el botón responde.
 ///
 /// Bloquea a propósito, y en las cuatro fases: mientras se espera la decisión,
 /// durante la descarga, al lanzar el instalador y si algo falla. Una versión
@@ -130,7 +144,16 @@ class UpdateBlockingScreen extends StatelessWidget {
     required this.onRetry,
     required this.onExit,
     required this.releasesPageUrl,
+    required this.width,
+    required this.automatic,
   });
+
+  /// Ancho del panel, para ocupar exactamente su hueco.
+  final double width;
+
+  /// `true` si la actualización va sola. Cambia el texto: no hay nada que
+  /// pulsar, así que prometer un botón sería mentir.
+  final bool automatic;
 
   final UpdateState state;
   final Future<void> Function() onInstall;
@@ -140,36 +163,29 @@ class UpdateBlockingScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Positioned.fill(
-      child: ColoredBox(
-        color: const Color(0xF00B0B0F),
-        child: Center(
-          child: Container(
-            width: 460,
-            padding: const EdgeInsets.fromLTRB(28, 26, 28, 22),
-            decoration: BoxDecoration(
-              color: kPanelBackground,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFF3A3A44)),
-              boxShadow: const <BoxShadow>[
-                BoxShadow(color: Color(0x99000000), blurRadius: 32),
-              ],
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                Image.asset(
-                  'assets/logo_mark.png',
-                  width: 54,
-                  height: 54,
-                  filterQuality: FilterQuality.high,
-                ),
-                const SizedBox(height: 16),
-                ..._body(),
-              ],
-            ),
+    return Container(
+      width: width,
+      padding: const EdgeInsets.fromLTRB(24, 22, 24, 20),
+      decoration: BoxDecoration(
+        color: kPanelBackground,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFF3A3A44)),
+        boxShadow: const <BoxShadow>[
+          BoxShadow(color: Color(0x99000000), blurRadius: 26),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Image.asset(
+            'assets/logo_mark.png',
+            width: 46,
+            height: 46,
+            filterQuality: FilterQuality.high,
           ),
-        ),
+          const SizedBox(height: 14),
+          ..._body(),
+        ],
       ),
     );
   }
@@ -179,6 +195,23 @@ class UpdateBlockingScreen extends StatelessWidget {
 
     switch (state.stage) {
       case UpdateStage.available:
+        if (automatic) {
+          return <Widget>[
+            _title(t.updateRequiredTitle),
+            const SizedBox(height: 10),
+            _text(t.updateRequiredBody(release?.version ?? '')),
+            const SizedBox(height: 16),
+            const LinearProgressIndicator(
+              minHeight: 3,
+              color: kAccent,
+              backgroundColor: Color(0xFF2E2E38),
+            ),
+            const SizedBox(height: 12),
+            _text(t.updateAutomaticNotice, muted: true),
+            const SizedBox(height: 14),
+            _actions(<Widget>[_secondary(t.exit, onExit)]),
+          ];
+        }
         return <Widget>[
           _title(t.updateRequiredTitle),
           const SizedBox(height: 10),

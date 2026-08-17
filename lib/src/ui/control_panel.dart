@@ -1093,6 +1093,68 @@ class _LanguagesTab extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         ZoneConsole(controller: controller, zone: PanelZone.languages),
+
+        const SectionTitle('Motor de OCR (lo que lee la pantalla)'),
+        const HelpText(
+          'El de Windows viene con el sistema: es gratis, no hay nada que '
+          'instalar, no sale nada del equipo y acierta más sobre capturas de '
+          'pantalla, sobre todo en japonés. Necesita que el idioma esté añadido '
+          'en Windows. Tesseract funciona en cualquier equipo y trae sus propios '
+          'paquetes, que Traducy descarga sin permisos de administrador.',
+        ),
+        SegmentedButton<OcrKind>(
+          segments: const <ButtonSegment<OcrKind>>[
+            ButtonSegment<OcrKind>(
+              value: OcrKind.windows,
+              label: Text('Windows'),
+              icon: Icon(Icons.window, size: 14),
+            ),
+            ButtonSegment<OcrKind>(
+              value: OcrKind.tesseract,
+              label: Text('Tesseract'),
+              icon: Icon(Icons.text_fields, size: 14),
+            ),
+          ],
+          selected: <OcrKind>{e.ocrKind},
+          onSelectionChanged: (Set<OcrKind> value) =>
+              controller.setOcrKind(value.first),
+          style: ButtonStyle(
+            textStyle: const WidgetStatePropertyAll<TextStyle>(
+              TextStyle(fontSize: 11.5),
+            ),
+            visualDensity: VisualDensity.compact,
+          ),
+        ),
+        if (e.ocrKind == OcrKind.windows)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: controller.windowsOcrAvailable
+                ? Text(
+                    controller.windowsOcrCoversRequest
+                        ? 'Windows reconoce: '
+                              '${controller.windowsOcrLanguages.join(', ')}'
+                        : 'Windows no tiene el idioma pedido. Añádelo en '
+                              'Configuración → Hora e idioma → Idioma y región, '
+                              'o cambia a Tesseract.',
+                    style: TextStyle(
+                      color: controller.windowsOcrCoversRequest
+                          ? kMuted
+                          : kSubtitleAccent,
+                      fontSize: 10.5,
+                      height: 1.35,
+                    ),
+                  )
+                : const Text(
+                    'Comprueba los motores en Diagnóstico para saber qué '
+                    'idiomas reconoce este Windows.',
+                    style: TextStyle(
+                      color: kMuted,
+                      fontSize: 10.5,
+                      height: 1.35,
+                    ),
+                  ),
+          ),
+
         const SectionTitle('Idioma del juego (lo que se lee)'),
         const HelpText(
           'El OCR necesita saber qué escritura leer. Elegir aquí "Japonés" '
@@ -1110,7 +1172,9 @@ class _LanguagesTab extends StatelessWidget {
                 value: option.ocrCode,
                 child: Text(
                   '${option.label}  ·  ${option.ocrCode}'
-                  '${controller.installedOcrLanguages.isNotEmpty && !controller.installedOcrLanguages.contains(option.ocrCode) ? '  (no instalado)' : ''}',
+                  // El aviso de "no instalado" es cosa de Tesseract: el motor de
+                  // Windows no usa estos paquetes y marcarlos ahi confundiria.
+                  '${e.ocrKind == OcrKind.tesseract && controller.installedOcrLanguages.isNotEmpty && !controller.installedOcrLanguages.contains(option.ocrCode) ? '  (no instalado)' : ''}',
                 ),
               ),
           ],
