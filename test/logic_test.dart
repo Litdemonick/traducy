@@ -7,6 +7,7 @@ import 'package:traducy/src/core/updater.dart';
 import 'package:traducy/src/models/settings.dart';
 import 'package:traducy/src/ocr/image_prep.dart';
 import 'package:traducy/src/ocr/ocr_engine.dart';
+import 'package:traducy/src/ocr/windows_ocr.dart';
 import 'package:traducy/src/translate/translator.dart';
 
 void main() {
@@ -496,6 +497,27 @@ void main() {
       final SubtitleBox clamped = box.clampTo(const Size(1920, 1080));
       expect(clamped.left + clamped.width, lessThanOrEqualTo(1920));
       expect(clamped.top + clamped.height, lessThanOrEqualTo(1080));
+    });
+  });
+
+  group('WindowsOcr', () {
+    test('traduce los codigos de Tesseract a etiquetas de Windows', () {
+      expect(WindowsOcr.tagForTesseractCode('jpn'), 'ja');
+      expect(WindowsOcr.tagForTesseractCode('chi_sim'), 'zh-Hans');
+      expect(WindowsOcr.tagForTesseractCode('kor_vert'), 'ko');
+      // Windows reconoce con un idioma a la vez: de 'jpn+eng' se queda el primero.
+      expect(WindowsOcr.tagForTesseractCode('jpn+eng'), 'ja');
+      // Un codigo desconocido se pasa tal cual en lugar de perderse.
+      expect(WindowsOcr.tagForTesseractCode('xyz'), 'xyz');
+    });
+
+    test('acepta la variante regional del idioma pedido', () {
+      // Windows devuelve 'ja-JP' y lo que se pide es 'ja': tienen que casar, o el
+      // motor diria que no tiene un idioma que si esta instalado.
+      expect(WindowsOcr.covers(<String>['en-US', 'ja-JP'], 'ja'), isTrue);
+      expect(WindowsOcr.covers(<String>['en-US'], 'ja'), isFalse);
+      expect(WindowsOcr.covers(<String>[], 'ja'), isFalse);
+      expect(WindowsOcr.covers(<String>['zh-Hans-CN'], 'zh-Hans'), isTrue);
     });
   });
 }

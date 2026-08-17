@@ -36,22 +36,24 @@ class UpdateSection extends StatelessWidget {
                 style: const TextStyle(color: Colors.white, fontSize: 12),
               ),
             ),
-            OutlinedButton.icon(
-              onPressed: state.isBusy
-                  ? null
-                  : () => controller.checkForUpdate(),
-              icon: const Icon(Icons.system_update_alt, size: 15),
-              label: Text(t.checkNow),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: kAccent,
-                side: const BorderSide(color: Color(0xFF3A3A44)),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
-                textStyle: const TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w600,
+            PressableScale(
+              child: OutlinedButton.icon(
+                onPressed: state.isBusy
+                    ? null
+                    : () => controller.checkForUpdate(),
+                icon: const Icon(Icons.system_update_alt, size: 15),
+                label: Text(t.checkNow),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: kAccent,
+                  side: const BorderSide(color: Color(0xFF3A3A44)),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  textStyle: const TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ),
@@ -82,20 +84,22 @@ class UpdateSection extends StatelessWidget {
             message: t.updateAvailable(release.version),
             hint: t.updateAvailableHint(release.readableSize),
             severity: NoticeSeverity.warning,
-            action: FilledButton.icon(
-              onPressed: onInstall,
-              icon: const Icon(Icons.download, size: 15),
-              label: Text(t.updateToVersion(release.version)),
-              style: FilledButton.styleFrom(
-                backgroundColor: kAccent,
-                foregroundColor: const Color(0xFF11131A),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
-                textStyle: const TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w700,
+            action: PressableScale(
+              child: FilledButton.icon(
+                onPressed: onInstall,
+                icon: const Icon(Icons.download, size: 15),
+                label: Text(t.updateToVersion(release.version)),
+                style: FilledButton.styleFrom(
+                  backgroundColor: kAccent,
+                  foregroundColor: const Color(0xFF11131A),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  textStyle: const TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
             ),
@@ -333,26 +337,30 @@ class UpdateBlockingScreen extends StatelessWidget {
     String label,
     IconData icon,
     Future<void> Function() action,
-  ) => FilledButton.icon(
-    onPressed: action,
-    icon: Icon(icon, size: 16),
-    label: Text(label),
-    style: FilledButton.styleFrom(
-      backgroundColor: kAccent,
-      foregroundColor: const Color(0xFF11131A),
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
-      textStyle: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
+  ) => PressableScale(
+    child: FilledButton.icon(
+      onPressed: action,
+      icon: Icon(icon, size: 16),
+      label: Text(label),
+      style: FilledButton.styleFrom(
+        backgroundColor: kAccent,
+        foregroundColor: const Color(0xFF11131A),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
+        textStyle: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
+      ),
     ),
   );
 
-  Widget _secondary(String label, VoidCallback action) => OutlinedButton(
-    onPressed: action,
-    style: OutlinedButton.styleFrom(
-      foregroundColor: kMuted,
-      side: const BorderSide(color: Color(0xFF3A3A44)),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
-      textStyle: const TextStyle(fontSize: 12.5),
+  Widget _secondary(String label, VoidCallback action) => PressableScale(
+    child: OutlinedButton(
+      onPressed: action,
+      style: OutlinedButton.styleFrom(
+        foregroundColor: kMuted,
+        side: const BorderSide(color: Color(0xFF3A3A44)),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+        textStyle: const TextStyle(fontSize: 12.5),
+      ),
+      child: Text(label),
     ),
-    child: Text(label),
   );
 }

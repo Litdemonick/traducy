@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../core/app_paths.dart';
@@ -650,27 +651,41 @@ class _ActionButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: <Widget>[
-        FilledButton.icon(
-          onPressed: onPressed,
-          icon: Icon(icon, size: 15),
-          label: Text(label),
-          style: FilledButton.styleFrom(
-            backgroundColor: kAccent,
-            foregroundColor: const Color(0xFF11131A),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            textStyle: const TextStyle(
-              fontSize: 11.5,
-              fontWeight: FontWeight.w700,
-            ),
+        PressableScale(
+          child: FilledButton.icon(
+            onPressed: onPressed,
+            icon: Icon(icon, size: 15),
+            label: Text(label),
+            style:
+                FilledButton.styleFrom(
+                  backgroundColor: kAccent,
+                  foregroundColor: const Color(0xFF11131A),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  textStyle: const TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ).copyWith(
+                  // Al pasar el ratón se aclara un poco: deja claro cuál es el botón
+                  // principal de cada paso sin necesidad de leerlo.
+                  overlayColor: const WidgetStatePropertyAll<Color>(
+                    Color(0x1A11131A),
+                  ),
+                ),
           ),
         ),
         if (secondaryLabel != null && onSecondary != null) ...<Widget>[
           const SizedBox(width: 8),
-          TextButton(
-            onPressed: onSecondary,
-            child: Text(
-              secondaryLabel!,
-              style: const TextStyle(fontSize: 11.5),
+          PressableScale(
+            child: TextButton(
+              onPressed: onSecondary,
+              child: Text(
+                secondaryLabel!,
+                style: const TextStyle(fontSize: 11.5),
+              ),
             ),
           ),
         ],
@@ -828,17 +843,19 @@ class _RegionTab extends StatelessWidget {
         ),
         SizedBox(
           width: double.infinity,
-          child: FilledButton.icon(
-            onPressed: () => controller.detectGameWindow(),
-            icon: const Icon(Icons.videogame_asset, size: 16),
-            label: const Text('Detectar el juego'),
-            style: FilledButton.styleFrom(
-              backgroundColor: kRegionAccent,
-              foregroundColor: const Color(0xFF11131A),
-              padding: const EdgeInsets.symmetric(vertical: 10),
-              textStyle: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
+          child: PressableScale(
+            child: FilledButton.icon(
+              onPressed: () => controller.detectGameWindow(),
+              icon: const Icon(Icons.videogame_asset, size: 16),
+              label: const Text('Detectar el juego'),
+              style: FilledButton.styleFrom(
+                backgroundColor: kRegionAccent,
+                foregroundColor: const Color(0xFF11131A),
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                textStyle: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
           ),
@@ -849,14 +866,27 @@ class _RegionTab extends StatelessWidget {
             padding: const EdgeInsets.only(top: 6),
             child: Row(
               children: <Widget>[
-                const Icon(Icons.link, size: 13, color: kRegionAccent),
+                Icon(
+                  controller.followConnected ? Icons.link : Icons.link_off,
+                  size: 13,
+                  color: controller.followConnected
+                      ? kRegionAccent
+                      : kSubtitleAccent,
+                ),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
-                    'Anclada a "${s.followWindowTitle}"',
+                    controller.followConnected
+                        ? 'Anclada a "${s.followWindowTitle}"'
+                        : 'Esperando "${s.followWindowTitle}" (no está abierta)',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: kRegionAccent, fontSize: 11),
+                    style: TextStyle(
+                      color: controller.followConnected
+                          ? kRegionAccent
+                          : kSubtitleAccent,
+                      fontSize: 11,
+                    ),
                   ),
                 ),
                 TextButton(
@@ -908,20 +938,28 @@ class _RegionTab extends StatelessWidget {
           value: s.subtitleLocked,
           onChanged: (bool v) => controller.setSubtitleLocked(v),
         ),
-        Container(
-          margin: const EdgeInsets.only(top: 10),
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: const Color(0xFF15151A),
-            borderRadius: BorderRadius.circular(8),
+        _LiveMetrics(
+          title: 'Zona de captura · píxeles reales de pantalla',
+          accent: kRegionAccent,
+          preview: controller.regionPreview,
+          fallback: region,
+          toRegion: controller.logicalRectToRegion,
+        ),
+        _LiveMetrics(
+          title: 'Caja de subtítulos · píxeles de la ventana',
+          accent: kSubtitleAccent,
+          preview: controller.subtitlePreview,
+          fallback: CaptureRegion(
+            left: s.subtitleBox.left.round(),
+            top: s.subtitleBox.top.round(),
+            width: s.subtitleBox.width.round(),
+            height: s.subtitleBox.height.round(),
           ),
-          child: Row(
-            children: <Widget>[
-              _MetricChip(label: 'X', value: '${region.left}'),
-              _MetricChip(label: 'Y', value: '${region.top}'),
-              _MetricChip(label: 'Ancho', value: '${region.width}'),
-              _MetricChip(label: 'Alto', value: '${region.height}'),
-            ],
+          toRegion: (Rect rect) => CaptureRegion(
+            left: rect.left.round(),
+            top: rect.top.round(),
+            width: rect.width.round(),
+            height: rect.height.round(),
           ),
         ),
         if (!region.isValid)
@@ -1121,6 +1159,81 @@ class _EditToggle extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Medidas que se actualizan **mientras** se arrastra.
+///
+/// Escucha el rectangulo de arrastre en lugar de esperar a que se suelte. Antes
+/// mostraba el valor guardado, que durante el arrastre es el de antes de empezar:
+/// numeros que no corresponden con lo que se esta viendo en pantalla. Un dato que
+/// miente es peor que no tenerlo.
+///
+/// Escuchando solo aqui, el resto del panel no se reconstruye a cada movimiento
+/// del raton, que es lo que hacia el arrastre lento.
+class _LiveMetrics extends StatelessWidget {
+  const _LiveMetrics({
+    required this.title,
+    required this.accent,
+    required this.preview,
+    required this.fallback,
+    required this.toRegion,
+  });
+
+  final String title;
+  final Color accent;
+
+  /// Rectangulo en curso, en pixeles logicos, o `null` si no se esta arrastrando.
+  final ValueListenable<Rect?> preview;
+
+  /// Lo que se muestra cuando no hay arrastre: el valor guardado.
+  final CaptureRegion fallback;
+
+  /// Conversion del rectangulo logico a las unidades que se muestran.
+  final CaptureRegion Function(Rect rect) toRegion;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+      decoration: BoxDecoration(
+        color: kControlSurface,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: accent.withValues(alpha: 0.25)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            title,
+            style: TextStyle(
+              color: accent,
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.3,
+            ),
+          ),
+          const SizedBox(height: 8),
+          ValueListenableBuilder<Rect?>(
+            valueListenable: preview,
+            builder: (BuildContext context, Rect? live, _) {
+              final CaptureRegion shown = live == null
+                  ? fallback
+                  : toRegion(live);
+              return Row(
+                children: <Widget>[
+                  _MetricChip(label: 'X', value: '${shown.left}'),
+                  _MetricChip(label: 'Y', value: '${shown.top}'),
+                  _MetricChip(label: 'Ancho', value: '${shown.width}'),
+                  _MetricChip(label: 'Alto', value: '${shown.height}'),
+                ],
+              );
+            },
+          ),
+        ],
       ),
     );
   }

@@ -269,8 +269,14 @@ class _RegionOverlay extends StatelessWidget {
           const Icon(Icons.link, size: 13, color: kRegionAccent),
         ],
       ],
-      onChanged: (Rect updated) =>
-          controller.setRegion(controller.logicalRectToRegion(updated)),
+      onPreview: (Rect preview) => controller.regionPreview.value = preview,
+      onChanged: (Rect updated) {
+        controller.setRegion(controller.logicalRectToRegion(updated));
+        // Se deja de mostrar el valor en curso: a partir de aqui manda el
+        // guardado, y mantener el otro haria que las medidas se quedaran
+        // congeladas si la zona cambia luego por un boton.
+        controller.regionPreview.value = null;
+      },
     );
   }
 }
@@ -375,14 +381,18 @@ class _SubtitleLayer extends StatelessWidget {
       // para desplazarse. La caja ya esta activada a mano desde el panel, asi
       // que capturar el raton dentro de ella es lo que espera quien la activo.
       passThroughBody: !useHistory,
-      onChanged: (Rect updated) => controller.setSubtitleBox(
-        SubtitleBox(
-          left: updated.left,
-          top: updated.top,
-          width: updated.width,
-          height: updated.height,
-        ),
-      ),
+      onPreview: (Rect preview) => controller.subtitlePreview.value = preview,
+      onChanged: (Rect updated) {
+        controller.setSubtitleBox(
+          SubtitleBox(
+            left: updated.left,
+            top: updated.top,
+            width: updated.width,
+            height: updated.height,
+          ),
+        );
+        controller.subtitlePreview.value = null;
+      },
       child: ClipRect(child: Center(child: subtitle)),
     );
   }

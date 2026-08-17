@@ -12,6 +12,13 @@ const Color kSubtitleAccent = Color(0xFFFFB74D);
 const Color kDanger = Color(0xFFEF5350);
 const Color kMuted = Color(0xFF9E9E9E);
 
+/// Fondo de cada control dentro del panel.
+///
+/// Existe para que cada ajuste sea su propia tarjeta en lugar de una linea mas en
+/// una lista apretada: con veinte controles seguidos, sin separacion visual no se
+/// distingue donde acaba uno y empieza el siguiente.
+const Color kControlSurface = Color(0xFF15151A);
+
 class SectionTitle extends StatelessWidget {
   const SectionTitle(this.text, {super.key, this.trailing});
 
@@ -21,21 +28,42 @@ class SectionTitle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(top: 18, bottom: 8),
-      child: Row(
+      padding: const EdgeInsets.only(top: 20, bottom: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Expanded(
-            child: Text(
-              text.toUpperCase(),
-              style: const TextStyle(
-                color: kAccent,
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 1.1,
+          Row(
+            children: <Widget>[
+              Container(
+                width: 3,
+                height: 13,
+                margin: const EdgeInsets.only(right: 8),
+                decoration: BoxDecoration(
+                  color: kAccent,
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
-            ),
+              Expanded(
+                child: Text(
+                  text.toUpperCase(),
+                  style: const TextStyle(
+                    color: kAccent,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1.1,
+                  ),
+                ),
+              ),
+              ?trailing,
+            ],
           ),
-          ?trailing,
+          // Linea fina bajo el titulo: es lo que hace evidente de un vistazo que
+          // todo lo que viene debajo pertenece a este bloque y no al anterior.
+          Container(
+            height: 1,
+            margin: const EdgeInsets.only(top: 8),
+            color: const Color(0xFF2A2A33),
+          ),
         ],
       ),
     );
@@ -84,8 +112,13 @@ class SliderRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final double safeValue = value.clamp(min, max);
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+      decoration: BoxDecoration(
+        color: kControlSurface,
+        borderRadius: BorderRadius.circular(8),
+      ),
       child: Row(
         children: <Widget>[
           SizedBox(
@@ -142,38 +175,52 @@ class SwitchRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: () => onChanged(!value),
-      borderRadius: BorderRadius.circular(6),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
-        child: Row(
-          children: <Widget>[
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(
-                    label,
-                    style: const TextStyle(color: Colors.white, fontSize: 12.5),
-                  ),
-                  if (subtitle != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 2),
-                      child: Text(
-                        subtitle!,
-                        style: const TextStyle(color: kMuted, fontSize: 11),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      decoration: BoxDecoration(
+        color: kControlSurface,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => onChanged(!value),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+          child: Row(
+            children: <Widget>[
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      label,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12.5,
                       ),
                     ),
-                ],
+                    if (subtitle != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 3),
+                        child: Text(
+                          subtitle!,
+                          style: const TextStyle(
+                            color: kMuted,
+                            fontSize: 11,
+                            height: 1.3,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
               ),
-            ),
-            Switch(
-              value: value,
-              activeThumbColor: kAccent,
-              onChanged: onChanged,
-            ),
-          ],
+              Switch(
+                value: value,
+                activeThumbColor: kAccent,
+                onChanged: onChanged,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -520,3 +567,117 @@ class NoticeCard extends StatelessWidget {
 }
 
 enum NoticeSeverity { info, warning, error, success }
+
+/// Envoltorio que hunde ligeramente su contenido al pulsarlo.
+///
+/// Los botones de Material ya tienen su ondulación, pero dentro de un overlay
+/// transparente sobre un juego esa ondulación se ve poco y queda la sensación de
+/// que el clic no ha entrado. Un cambio de escala de 60 ms se percibe siempre, y
+/// es lo que convierte "he pulsado y no sé si ha pasado algo" en una respuesta
+/// clara.
+class PressableScale extends StatefulWidget {
+  const PressableScale({super.key, required this.child, this.scale = 0.96});
+
+  final Widget child;
+
+  /// Escala al mantener pulsado. Deliberadamente sutil: hundir más parece un
+  /// fallo de dibujado.
+  final double scale;
+
+  @override
+  State<PressableScale> createState() => _PressableScaleState();
+}
+
+class _PressableScaleState extends State<PressableScale> {
+  bool _down = false;
+
+  void _set(bool value) {
+    if (_down == value || !mounted) return;
+    setState(() => _down = value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Listener(
+      // `Listener` y no `GestureDetector`: así no compite por el gesto con el
+      // botón que envuelve, que es quien debe recibir el toque.
+      onPointerDown: (_) => _set(true),
+      onPointerUp: (_) => _set(false),
+      onPointerCancel: (_) => _set(false),
+      child: AnimatedScale(
+        scale: _down ? widget.scale : 1.0,
+        duration: const Duration(milliseconds: 60),
+        curve: Curves.easeOut,
+        child: widget.child,
+      ),
+    );
+  }
+}
+
+/// Botón de copiar que confirma lo que ha hecho.
+///
+/// Al pulsarlo, el icono se convierte en una marca de verificación verde durante
+/// un segundo y medio. Sin esa confirmación no hay forma de saber si el
+/// portapapeles tiene el enlace: el mensaje de la consola queda más abajo y a
+/// menudo fuera de la vista.
+class CopyIconButton extends StatefulWidget {
+  const CopyIconButton({
+    super.key,
+    required this.onPressed,
+    required this.tooltip,
+  });
+
+  final Future<void> Function() onPressed;
+  final String tooltip;
+
+  @override
+  State<CopyIconButton> createState() => _CopyIconButtonState();
+}
+
+class _CopyIconButtonState extends State<CopyIconButton> {
+  bool _done = false;
+  Timer? _reset;
+
+  @override
+  void dispose() {
+    _reset?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _handle() async {
+    await widget.onPressed();
+    if (!mounted) return;
+    setState(() => _done = true);
+    _reset?.cancel();
+    // El temporizador se guarda para poder cancelarlo: pulsando dos veces
+    // seguidas, el primero apagaría la marca del segundo.
+    _reset = Timer(const Duration(milliseconds: 1500), () {
+      if (mounted) setState(() => _done = false);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PressableScale(
+      scale: 0.86,
+      child: IconButton(
+        tooltip: widget.tooltip,
+        color: _done ? kRegionAccent : kMuted,
+        visualDensity: VisualDensity.compact,
+        constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+        padding: EdgeInsets.zero,
+        onPressed: _handle,
+        icon: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 160),
+          transitionBuilder: (Widget child, Animation<double> animation) =>
+              ScaleTransition(scale: animation, child: child),
+          child: Icon(
+            _done ? Icons.check : Icons.copy,
+            key: ValueKey<bool>(_done),
+            size: 14,
+          ),
+        ),
+      ),
+    );
+  }
+}

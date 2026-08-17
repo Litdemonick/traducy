@@ -100,8 +100,15 @@ class AppController extends ChangeNotifier {
   /// Desplazamiento de la región respecto a la esquina de la ventana seguida.
   /// Guardar el desplazamiento (y no coordenadas absolutas) es lo que permite
   /// que la zona acompañe al juego cuando el usuario lo mueve.
-  int _followOffsetX = 0;
-  int _followOffsetY = 0;
+  /// `true` si ahora mismo hay una ventana enganchada de verdad.
+  ///
+  /// La interfaz lo necesita: "anclada a X" sin saber si esa ventana existe es
+  /// engañoso justo cuando hace falta saberlo, con el juego cerrado.
+  bool _followConnected = false;
+  bool get followConnected => _followConnected;
+
+  /// Para no repetir el aviso de "no encuentro la ventana" cada 700 ms.
+  bool _followLossReported = false;
 
   Timer? _topmostTimer;
   Timer? _followTimer;
@@ -136,6 +143,12 @@ class AppController extends ChangeNotifier {
       // que el usuario va a leer en la consola del panel.
       L10n.apply(_settings.uiLanguage);
       _configMode = _settings.startInConfigMode;
+
+      if (_settings.regionMode == RegionMode.followWindow) {
+        // El identificador de la ventana no se puede guardar, asi que se busca
+        // otra vez por el titulo que si se guardo.
+        reacquireFollowWindow(quiet: true);
+      }
 
       await _pickWorkingOcrEngine();
 
@@ -380,6 +393,14 @@ class AppController extends ChangeNotifier {
     _followTimer?.cancel();
     _followTimer = Timer.periodic(const Duration(milliseconds: 700), (_) {
       if (_settings.regionMode != RegionMode.followWindow) return;
+      // La ventana pudo cerrarse y volver a abrirse con otro identificador: es lo
+      // normal al reiniciar el juego, y sin reintentar aqui el anclaje quedaba
+      // roto para siempre sin ninguna senal.
+      if (_followHwnd == 0 || foreignWindowRect(_followHwnd) == null) {
+        final bool reconnected = reacquireFollowWindow();
+        if (reconnected) notifyListeners();
+        if (!reconnected) return;
+      }
       // Solo notifica si el rectángulo cambió, para no repintar sin motivo.
       final CaptureRegion resolved = resolveCaptureRegion();
       if (resolved.left != _settings.region.left ||
@@ -541,6 +562,15 @@ class AppController extends ChangeNotifier {
     }
   }
 
+  /// Rectángulo que se está arrastrando ahora mismo, en píxeles lógicos.
+  ///
+  /// Va en un `ValueNotifier` y no en el estado del controlador a propósito: las
+  /// medidas del panel tienen que ir en vivo mientras se arrastra, pero
+  /// reconstruir el panel entero a cada movimiento del ratón es justo lo que hacía
+  /// el arrastre lento. Así solo se repinta el puñado de números que mira esto.
+  final ValueNotifier<Rect?> regionPreview = ValueNotifier<Rect?>(null);
+  final ValueNotifier<Rect?> subtitlePreview = ValueNotifier<Rect?>(null);
+
   // --------------------------------------------------------- región activa
 
   /// Región efectiva a capturar en este instante.
@@ -550,8 +580,8 @@ class AppController extends ChangeNotifier {
           foreignWindowRect(_followHwnd);
       if (rect != null) {
         return CaptureRegion(
-          left: rect.left + _followOffsetX,
-          top: rect.top + _followOffsetY,
+          left: rect.left + _settings.followOffsetX,
+          top: rect.top + _settings.followOffsetY,
           width: _settings.region.width,
           height: _settings.region.height,
         );
@@ -1078,15 +1108,16 @@ class AppController extends ChangeNotifier {
       width: width,
       height: height,
     );
-    _followOffsetX = region.left - window.left;
-    _followOffsetY = region.top - window.top;
     _commit(
       _settings.copyWith(
         regionMode: RegionMode.followWindow,
         followWindowTitle: window.title,
+        followOffsetX: region.left - window.left,
+        followOffsetY: region.top - window.top,
         region: region,
       ),
     );
+    _followConnected = true;
     toasts.success(
       'Siguiendo a "${window.title}"',
       detail:
@@ -1098,6 +1129,8 @@ class AppController extends ChangeNotifier {
   void stopFollowingWindow() {
     toasts.info('La zona ya no sigue a ninguna ventana');
     _followHwnd = 0;
+    _followConnected = false;
+    _followLossReported = false;
     _commit(
       _settings.copyWith(
         regionMode: RegionMode.fixed,
@@ -1107,6 +1140,67 @@ class AppController extends ChangeNotifier {
     );
   }
 
+  /// Vuelve a encontrar la ventana que se estaba siguiendo, por su título.
+  ///
+  /// Los identificadores de ventana de Windows no sobreviven a nada: cambian
+  /// cada vez que el juego se abre, y no se pueden guardar en disco. Sin este
+  /// reengancharse, "seguir ventana" solo funcionaba hasta cerrar Traducy o el
+  /// juego, y después se comportaba como una zona fija sin decir nada, que es
+  /// exactamente el sintoma de "no anda".
+  ///
+  /// El título tampoco es estable del todo (muchos juegos le añaden el capítulo o
+  /// los FPS), así que se prueba primero la coincidencia exacta y luego una
+  /// parcial, y si el título ha cambiado se guarda el nuevo.
+  bool reacquireFollowWindow({bool quiet = false}) {
+    final String wanted = _settings.followWindowTitle.trim();
+    if (wanted.isEmpty) return false;
+
+    ForeignWindow? exact;
+    ForeignWindow? partial;
+    for (final ForeignWindow window in listTopLevelWindows()) {
+      final String title = window.title.trim();
+      if (title == wanted) {
+        exact = window;
+        break;
+      }
+      if (partial == null &&
+          (title.startsWith(wanted) ||
+              wanted.startsWith(title) ||
+              title.toLowerCase().contains(wanted.toLowerCase()))) {
+        partial = window;
+      }
+    }
+
+    final ForeignWindow? found = exact ?? partial;
+    if (found == null) {
+      _followConnected = false;
+      if (!quiet && !_followLossReported) {
+        _followLossReported = true;
+        log.w('controller', 'No se encuentra la ventana "$wanted"');
+        toasts.warning(
+          'No encuentro la ventana "$wanted"',
+          detail:
+              'La zona se queda donde estaba. Abre el juego, o pulsa Detectar '
+              'el juego para engancharla a otra ventana.',
+        );
+      }
+      return false;
+    }
+
+    _followHwnd = found.hwnd;
+    _followConnected = true;
+    _followLossReported = false;
+    // El título pudo cambiar: se guarda el actual para que la próxima búsqueda
+    // acierte a la primera.
+    if (found.title.trim() != wanted) {
+      _commit(_settings.copyWith(followWindowTitle: found.title.trim()));
+    }
+    if (!quiet) {
+      log.i('controller', 'Reengachada a "${found.title}"');
+    }
+    return true;
+  }
+
   void _recomputeFollowOffset() {
     if (_settings.regionMode != RegionMode.followWindow || _followHwnd == 0) {
       return;
@@ -1114,8 +1208,12 @@ class AppController extends ChangeNotifier {
     final ({int left, int top, int width, int height})? rect =
         foreignWindowRect(_followHwnd);
     if (rect == null) return;
-    _followOffsetX = _settings.region.left - rect.left;
-    _followOffsetY = _settings.region.top - rect.top;
+    _commit(
+      _settings.copyWith(
+        followOffsetX: _settings.region.left - rect.left,
+        followOffsetY: _settings.region.top - rect.top,
+      ),
+    );
   }
 
   // -------------------------------------------------------------- motores
@@ -1825,6 +1923,8 @@ class AppController extends ChangeNotifier {
 
   @override
   void dispose() {
+    regionPreview.dispose();
+    subtitlePreview.dispose();
     _topmostTimer?.cancel();
     _followTimer?.cancel();
     _hitTestTimer?.cancel();

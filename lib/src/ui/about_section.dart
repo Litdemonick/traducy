@@ -192,7 +192,7 @@ class _InfoRow extends StatelessWidget {
   final IconData icon;
   final String label;
   final String value;
-  final VoidCallback onCopy;
+  final Future<void> Function() onCopy;
 
   @override
   Widget build(BuildContext context) {
@@ -220,15 +220,7 @@ class _InfoRow extends StatelessWidget {
               ),
             ),
           ),
-          IconButton(
-            tooltip: t.copyLinkTooltip,
-            icon: const Icon(Icons.copy, size: 13),
-            color: kMuted,
-            visualDensity: VisualDensity.compact,
-            constraints: const BoxConstraints(minWidth: 26, minHeight: 26),
-            padding: EdgeInsets.zero,
-            onPressed: onCopy,
-          ),
+          CopyIconButton(tooltip: t.copyLinkTooltip, onPressed: onCopy),
         ],
       ),
     );

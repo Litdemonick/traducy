@@ -25,6 +25,7 @@ class DraggableBox extends StatefulWidget {
     super.key,
     required this.rect,
     required this.onChanged,
+    this.onPreview,
     required this.bounds,
     this.locked = false,
     this.onToggleLock,
@@ -50,6 +51,14 @@ class DraggableBox extends StatefulWidget {
   final Rect rect;
 
   final ValueChanged<Rect> onChanged;
+
+  /// Aviso continuo mientras se arrastra, para quien solo quiera mirar.
+  ///
+  /// Existe aparte de [onChanged] por una razon concreta: [onChanged] guarda los
+  /// ajustes y reconstruye media interfaz, y hacerlo en cada movimiento del raton
+  /// hacia el arrastre lento. Esto no guarda nada, solo cuenta por donde va la
+  /// caja, y con eso las medidas del panel pueden ir en vivo sin coste.
+  final ValueChanged<Rect>? onPreview;
 
   /// Límites en los que se puede mover (normalmente el tamaño de la ventana).
   final Size bounds;
@@ -191,6 +200,7 @@ class _DraggableBoxState extends State<DraggableBox> {
     }
     if (updated == _dragRect) return; // Nada que repintar.
     setState(() => _dragRect = updated);
+    widget.onPreview?.call(updated);
   }
 
   Widget _handle(_DragMode mode, Alignment alignment, MouseCursor cursor) {

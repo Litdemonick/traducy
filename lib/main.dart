@@ -32,6 +32,20 @@ Future<void> main() async {
     return true; // tratado: no propagar
   };
 
+  // Un widget que falla al construirse no puede dejar un rectangulo rojo
+  // ocupando la pantalla por encima del juego. Se sustituye por algo diminuto y
+  // discreto: el fallo queda en el registro, que es donde sirve de algo, y el
+  // resto de la interfaz sigue funcionando.
+  ErrorWidget.builder = (FlutterErrorDetails details) {
+    log.e(
+      'widget',
+      details.exceptionAsString(),
+      details.exception,
+      details.stack,
+    );
+    return const SizedBox.shrink();
+  };
+
   WidgetsFlutterBinding.ensureInitialized();
 
   if (!Platform.isWindows) {
@@ -52,8 +66,8 @@ Future<void> _initializeWindow() async {
   }
 
   // flutter_acrylic da transparencia real a través del compositor de Windows.
-  // Si falla, la app sigue funcionando: el modo compatible por color clave
-  // (en Zona → Transparencia) cubre esos equipos.
+  // Si falla, la aplicación sigue arrancando y se anota en el registro: el fondo
+  // se verá opaco, pero todo lo demás funciona y el diagnóstico dice por qué.
   try {
     await Window.initialize();
     await Window.setEffect(

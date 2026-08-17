@@ -614,6 +614,8 @@ class AppSettings {
     this.panelWidth = 560,
     this.panelHeight = 720,
     this.followWindowTitle = '',
+    this.followOffsetX = 0,
+    this.followOffsetY = 0,
     this.subtitleBox = const SubtitleBox(
       left: 120,
       top: 520,
@@ -679,6 +681,15 @@ class AppSettings {
   /// cada arranque del juego; el título sí permite reencontrarla.
   final String followWindowTitle;
 
+  /// Desplazamiento de la zona respecto a la esquina de la ventana seguida.
+  ///
+  /// Se guarda en disco, y eso es justo lo que hacía falta: sin ello, al volver a
+  /// abrir Traducy la zona aparecía pegada a la esquina superior izquierda de la
+  /// ventana en lugar de donde se había dejado, porque el desplazamiento solo
+  /// existía en memoria.
+  final int followOffsetX;
+  final int followOffsetY;
+
   final SubtitleBox subtitleBox;
   final SubtitleStyle style;
   final PreprocessSettings preprocess;
@@ -721,6 +732,8 @@ class AppSettings {
     double? panelHeight,
     RegionMode? regionMode,
     String? followWindowTitle,
+    int? followOffsetX,
+    int? followOffsetY,
     SubtitleBox? subtitleBox,
     SubtitleStyle? style,
     PreprocessSettings? preprocess,
@@ -745,6 +758,8 @@ class AppSettings {
     panelWidth: panelWidth ?? this.panelWidth,
     panelHeight: panelHeight ?? this.panelHeight,
     followWindowTitle: followWindowTitle ?? this.followWindowTitle,
+    followOffsetX: followOffsetX ?? this.followOffsetX,
+    followOffsetY: followOffsetY ?? this.followOffsetY,
     subtitleBox: subtitleBox ?? this.subtitleBox,
     style: style ?? this.style,
     preprocess: preprocess ?? this.preprocess,
@@ -772,6 +787,8 @@ class AppSettings {
     'panelWidth': panelWidth,
     'panelHeight': panelHeight,
     'followWindowTitle': followWindowTitle,
+    'followOffsetX': followOffsetX,
+    'followOffsetY': followOffsetY,
     'subtitleBox': subtitleBox.toJson(),
     'style': style.toJson(),
     'preprocess': preprocess.toJson(),
@@ -811,6 +828,8 @@ class AppSettings {
       720,
     ).clamp(panelMinHeight, panelMaxHeight),
     followWindowTitle: _asString(json['followWindowTitle'], ''),
+    followOffsetX: _asInt(json['followOffsetX'], 0),
+    followOffsetY: _asInt(json['followOffsetY'], 0),
     subtitleBox: SubtitleBox.fromJson(_asMap(json['subtitleBox'])),
     style: SubtitleStyle.fromJson(_asMap(json['style'])),
     preprocess: PreprocessSettings.fromJson(_asMap(json['preprocess'])),
