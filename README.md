@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="assets/logo_traducy.png" alt="Traducy" width="360">
+# Traducy
 
 **Traductor de pantalla en tiempo real para Windows**
 
@@ -314,36 +314,6 @@ flutter build windows --release   # ejecutable final
 
 El ejecutable queda en `build\windows\x64\runner\Release\traducy.exe`.
 
-## Iconos y logo
-
-El logo de partida es `assets/logo_traducy.jpg`. De él se derivan, con
-`tools/make_icons.py`:
-
-| Salida | Uso |
-|---|---|
-| `assets/logo_mark.png` | Símbolo suelto, transparente. Cabecera del panel. |
-| `assets/logo_traducy.png` | Logo completo, transparente. Pantalla de arranque. |
-| `assets/tray_icon.ico` | Icono de la bandeja del sistema. |
-| `windows/runner/resources/app_icon.ico` | Ejecutable, barra de tareas, Alt+Tab y explorador. |
-| `installer/wizard_*.bmp` | Imágenes del asistente de instalación. |
-
-Los `.ico` llevan nueve tamaños (16 a 256 px) para que Windows tenga la versión
-adecuada en cada sitio en lugar de reescalar una sola.
-
-El JPEG original no tiene transparencia, así que el alfa se reconstruye de dos
-formas distintas: el símbolo con una máscara de esquinas redondeadas cuyo radio
-se **mide** sobre el propio arte (estimarlo dejaba fondo asomando en las
-esquinas), y la palabra invirtiendo la mezcla alfa a partir del color de fondo y
-del de la tinta, que da un texto nítido en lugar del halo gris que deja un umbral
-simple.
-
-```powershell
-python tools\make_icons.py
-```
-
-Solo necesita Pillow. Tras regenerar el `.ico` del runner hay que recompilar para
-que Windows tome el icono nuevo.
-
 ## Crear el instalador para compartir
 
 Con [Inno Setup 6](https://jrsoftware.org/isdl.php) instalado:
@@ -362,7 +332,7 @@ pasar a cualquiera. Lo que hace:
   dejar dos copias. Si la instalada es más nueva, avisa antes de sobrescribirla.
 - **Cierra Traducy si está abierto** antes de sustituir los ficheros: sin eso, la
   actualización falla con "fichero en uso".
-- **Español e inglés** en el asistente, con el logo de Traducy.
+- **Español e inglés** en el asistente.
 - **Avisa sobre Tesseract** antes de instalar, para que nadie se lleve la sorpresa
   de que la aplicación no traduce hasta instalarlo.
 - **Muestra el autor y los enlaces del proyecto**, para que quien reciba el `.exe`
@@ -467,7 +437,6 @@ lib/
     state/      controlador central
     ui/         overlay, cajas arrastrables, panel, consolas, subtítulos, bandeja
 tools/
-  make_icons.py                 genera los iconos a partir del logo
   set_version.py                sincroniza la versión en los tres sitios
 installer/
   traducy.iss                   instalador Inno Setup (ES/EN)
@@ -495,7 +464,7 @@ dart analyze
 
 <div align="center">
 
-**Traducy** · hecho por [Litdemonick](https://github.com/Litdemonick)
+Hecho por [Litdemonick](https://github.com/Litdemonick)
 
 [Repositorio](https://github.com/Litdemonick/traducy) ·
 [Versiones](https://github.com/Litdemonick/traducy/releases) ·
