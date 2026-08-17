@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../core/about.dart';
 import '../models/settings.dart';
 import '../pipeline/pipeline.dart';
 import '../state/app_controller.dart';
@@ -7,7 +8,7 @@ import 'toasts.dart';
 import 'widgets_common.dart';
 
 /// Las áreas del panel, cada una con su propia guía.
-enum PanelZone { region, languages, style, performance, diagnostics }
+enum PanelZone { region, languages, style, performance, diagnostics, about }
 
 /// Consola de ayuda contextual.
 ///
@@ -267,6 +268,22 @@ class ZoneConsole extends StatelessWidget {
             'El registro guarda los últimos 400 eventos con su hora.',
           ],
         );
+
+      case PanelZone.about:
+        return _ZoneInfo(
+          color: kAccent,
+          icon: Icons.info_outline,
+          headline: 'Versión ${c.currentVersion} · ${About.author}',
+          body:
+              'Datos del proyecto y la carpeta donde Traducy guarda todo. Los '
+              'enlaces se copian al portapapeles en vez de abrirse: sacar un '
+              'navegador por encima del juego estorba más de lo que ayuda.',
+          tips: const <String>[
+            'Pega el enlace del repositorio en el navegador para ver el código.',
+            'Si algo no funciona, el enlace de incidencias es el sitio donde '
+                'contarlo.',
+          ],
+        );
     }
   }
 }
@@ -292,9 +309,22 @@ class _LiveFeed extends StatefulWidget {
 class _LiveFeedState extends State<_LiveFeed> {
   final ScrollController _scroll = ScrollController();
 
-  /// Alto fijo: unas cinco líneas. Dejarlo crecer libre movería todo el panel
-  /// cada vez que entra un mensaje.
-  static const double _height = 86;
+  /// Alto fijo. Dejarlo crecer libre movería todo el panel cada vez que entra un
+  /// mensaje.
+  static const double _height = 130;
+
+  /// Identificador del mensaje que estaba arriba en el último repintado.
+  ///
+  /// Sirve para distinguir "ha llegado un mensaje nuevo" de "el widget se ha
+  /// repintado". Se repinta muchas veces por segundo, porque el estado del
+  /// pipeline cambia con cada ciclo, y sin esta distinción cualquier repintado
+  /// devolvía la lista al principio: el usuario bajaba a leer y algo lo subía de
+  /// vuelta a los milisegundos.
+  int? _topMessageId;
+
+  /// Margen para considerar que el usuario está mirando el principio de la
+  /// lista. Un par de píxeles de inercia no cuentan como haber bajado.
+  static const double _atTopSlack = 24;
 
   @override
   void dispose() {
@@ -305,16 +335,34 @@ class _LiveFeedState extends State<_LiveFeed> {
   @override
   void didUpdateWidget(_LiveFeed oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Lo nuevo va arriba, así que se vuelve al principio al llegar un mensaje;
-    // si no, el último quedaría fuera de la vista.
-    if (_scroll.hasClients && _scroll.offset > 0) {
-      _scroll.jumpTo(0);
+    _followNewMessages();
+  }
+
+  /// Lo nuevo va arriba, así que el seguimiento consiste en volver al principio;
+  /// pero solo si hay un mensaje nuevo **y** el usuario ya estaba mirando ahí.
+  /// Si ha bajado a leer algo, se le deja en paz: es su desplazamiento, no el
+  /// nuestro.
+  void _followNewMessages() {
+    final List<ToastMessage> history = toasts.history;
+    final int? newest = history.isEmpty ? null : history.first.id;
+    if (newest == _topMessageId) return;
+
+    final bool isFirstBuild = _topMessageId == null;
+    _topMessageId = newest;
+    if (!_scroll.hasClients) return;
+    if (isFirstBuild || _scroll.offset <= _atTopSlack) {
+      // Después del repintado: durante `didUpdateWidget` la lista todavía tiene
+      // el número de elementos anterior.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_scroll.hasClients) _scroll.jumpTo(0);
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final List<ToastMessage> history = toasts.history;
+    _topMessageId ??= history.isEmpty ? null : history.first.id;
     final PipelineStatus? s = widget.status;
     final bool showPipeline = s != null && s.state != PipelineState.stopped;
 

@@ -93,6 +93,89 @@ void main() {
 
     test('huellas de tamaños distintos se consideran diferentes', () {
       expect(signatureDistance(Uint8List(4), Uint8List(8)), 255);
+      expect(signatureChangePercent(Uint8List(4), Uint8List(8)), 100);
+    });
+
+    /// Escribe una franja horizontal clara sobre un fondo oscuro, imitando un
+    /// renglón de diálogo dentro de una zona ancha.
+    Uint8List frameWithTextBand(
+      int width,
+      int height,
+      int bandTop,
+      int bandHeight, {
+      int? bandWidth,
+    }) {
+      final Uint8List bytes = solidFrame(width, height, 20);
+      final int limit = (bandWidth ?? width).clamp(0, width);
+      for (int y = bandTop; y < bandTop + bandHeight && y < height; y++) {
+        for (int x = 0; x < limit; x++) {
+          // Trazos alternos: el texto no rellena la línea entera.
+          if ((x ~/ 3) % 2 == 1) continue;
+          final int i = (y * width + x) * 4;
+          bytes[i] = 235;
+          bytes[i + 1] = 235;
+          bytes[i + 2] = 235;
+        }
+      }
+      return bytes;
+    }
+
+    test('un renglón corto en una franja ancha se detecta como cambio', () {
+      // El caso que estaba roto: una línea corta de diálogo dentro de una zona
+      // de captura ancha. Mueve mucho unas pocas celdas y nada el resto, así que
+      // su diferencia media queda por debajo del umbral que se usaba antes (6
+      // sobre 255) y se descartaba como "sin cambios": no se traducía nunca.
+      const int w = 1600;
+      const int h = 220;
+      final Uint8List before = computeSignature(solidFrame(w, h, 20), w, h);
+      final Uint8List after = computeSignature(
+        frameWithTextBand(w, h, 150, 22, bandWidth: 300),
+        w,
+        h,
+      );
+
+      expect(signatureDistance(before, after), lessThan(6));
+      expect(
+        signatureChangePercent(before, after),
+        greaterThan(const PipelineSettings().minChangePercent),
+      );
+    });
+
+    test('el ruido de fondo no cuenta como cambio', () {
+      const int w = 640;
+      const int h = 200;
+      final Uint8List base = solidFrame(w, h, 120);
+      final Uint8List noisy = solidFrame(w, h, 120);
+      // Variación de pocos niveles por todas partes, como la compresión de vídeo
+      // o un degradado animado.
+      for (int i = 0; i < noisy.length; i += 4) {
+        final int delta = (i ~/ 4) % 5;
+        noisy[i] = 120 + delta;
+        noisy[i + 1] = 120 + delta;
+        noisy[i + 2] = 120 + delta;
+      }
+      final double changed = signatureChangePercent(
+        computeSignature(base, w, h),
+        computeSignature(noisy, w, h),
+      );
+      expect(changed, lessThan(const PipelineSettings().minChangePercent));
+    });
+
+    test('una zona lisa se reconoce como plana', () {
+      expect(
+        isSignatureFlat(computeSignature(solidFrame(80, 40, 0), 80, 40)),
+        isTrue,
+      );
+      expect(
+        isSignatureFlat(computeSignature(solidFrame(80, 40, 130), 80, 40)),
+        isTrue,
+      );
+      expect(
+        isSignatureFlat(
+          computeSignature(frameWithTextBand(640, 200, 80, 30), 640, 200),
+        ),
+        isFalse,
+      );
     });
   });
 

@@ -117,6 +117,14 @@ class AppController extends ChangeNotifier {
   bool _minimized = false;
   bool get isMinimized => _minimized;
 
+  /// En segundo plano (modo juego): ventana oculta, solo icono en la bandeja.
+  bool _background = false;
+  bool get isInBackground => _background;
+
+  /// `true` cuando no hay ventana a la vista, por minimizado o por segundo
+  /// plano. Los temporizadores lo usan para no trabajar en balde.
+  bool get isHidden => _minimized || _background;
+
   // --------------------------------------------------------------- arranque
 
   Future<void> initialize() async {
@@ -230,19 +238,56 @@ class AppController extends ChangeNotifier {
     );
   }
 
-  /// Manda Traducy a segundo plano: la ventana se oculta por completo y solo
-  /// queda el icono de la bandeja del sistema.
+  /// Minimiza la ventana dejando su botón en la barra de tareas.
   ///
-  /// Se usa `hide()` y no `minimize()` a propósito. Minimizar deja un botón en
-  /// la barra de tareas de una ventana que ocupa todo el escritorio, y eso
-  /// estorba; ocultarla la saca de en medio de verdad, y el icono de la bandeja
-  /// es la vía de vuelta (clic izquierdo abre, derecho da opciones).
+  /// Es minimizar de verdad, no ocultar: el botón sigue ahí y al pulsarlo la
+  /// ventana vuelve, que es lo que espera cualquiera de la flecha de minimizar.
+  /// El modo "segundo plano" con icono junto al reloj es otra cosa y lo hace el
+  /// botón del ojo.
+  ///
+  /// Antes de minimizar se devuelve el foco a la ventana. Mientras juega,
+  /// Traducy lleva `WS_EX_NOACTIVATE` para no robar el foco, y una ventana con
+  /// ese estilo no se restaura al pulsar su botón en la barra de tareas: Windows
+  /// necesita poder activarla. Al restaurar se reaplica el modo que tocaba.
   Future<void> minimizeOverlay() async {
     try {
+      _overlay.setFocusable(true);
+      _appliedInteractive = null;
       _minimized = true;
       notifyListeners();
-      // Fuera de la barra de tareas mientras está en segundo plano, para que no
-      // aparezca duplicado junto al icono de la bandeja.
+      await windowManager.setSkipTaskbar(false);
+      await windowManager.minimize();
+      log.i('controller', 'Minimizado. Su botón sigue en la barra de tareas.');
+      toasts.info(
+        'Traducy minimizado',
+        detail: 'Pulsa su botón en la barra de tareas para volver.',
+      );
+    } catch (e) {
+      log.w('controller', 'No se pudo minimizar: $e');
+      toasts.error(
+        'No se pudo minimizar',
+        detail: 'Usa el ojo para pasar a modo juego, o Ctrl+Alt+T.',
+      );
+      _minimized = false;
+      notifyListeners();
+      await _applyInteractionMode();
+    }
+  }
+
+  /// Manda Traducy a segundo plano: modo juego con la ventana fuera de la vista
+  /// y solo el icono junto al reloj.
+  ///
+  /// Distinto de minimizar: aquí la ventana se oculta por completo y sale de la
+  /// barra de tareas, para que no estorbe mientras se juega. La vuelta es el
+  /// icono de la bandeja (clic izquierdo abre el panel, derecho da opciones) o
+  /// Ctrl+Alt+T.
+  Future<void> sendToBackground() async {
+    try {
+      _background = true;
+      _minimized = false;
+      notifyListeners();
+      // Fuera de la barra de tareas mientras está oculta, para no aparecer
+      // duplicado junto al icono de la bandeja.
       await windowManager.setSkipTaskbar(true);
       await windowManager.hide();
       log.i(
@@ -251,7 +296,7 @@ class AppController extends ChangeNotifier {
             'para recuperarlo.',
       );
       toasts.info(
-        'Traducy sigue funcionando en segundo plano',
+        'Traducy en segundo plano',
         detail: 'Clic en su icono junto al reloj, o Ctrl+Alt+T, para volver.',
       );
     } catch (e) {
@@ -260,13 +305,17 @@ class AppController extends ChangeNotifier {
         'No se pudo pasar a segundo plano',
         detail: 'Usa Ctrl+Alt+T para ocultar el panel mientras juegas.',
       );
-      _minimized = false;
+      _background = false;
       notifyListeners();
     }
   }
 
-  /// Trae Traducy de vuelta desde segundo plano.
-  Future<void> restoreOverlay() async {
+  /// Trae Traducy de vuelta, esté minimizado o en segundo plano.
+  ///
+  /// Con [openPanel] se abre además el panel de control. Es lo que hace el clic
+  /// izquierdo en el icono de la bandeja: quien lo pulsa quiere ver la ventana,
+  /// no recuperar un overlay invisible y quedarse sin nada delante.
+  Future<void> restoreOverlay({bool openPanel = false}) async {
     try {
       await windowManager.setSkipTaskbar(false);
       if (await windowManager.isMinimized()) {
@@ -278,6 +327,7 @@ class AppController extends ChangeNotifier {
       await _positionWindowOverVirtualScreen();
       _overlay.applyOverlayStyles();
       _overlay.excludeFromCapture(true);
+      if (openPanel) _configMode = true;
       _appliedInteractive = null; // fuerza reaplicar el modo de ratón
       await _applyInteractionMode();
       _overlay.bringToTop();
@@ -285,8 +335,26 @@ class AppController extends ChangeNotifier {
       log.w('controller', 'No se pudo restaurar la ventana: $e');
     } finally {
       _minimized = false;
+      _background = false;
       notifyListeners();
     }
+  }
+
+  /// Sincroniza el estado cuando Windows minimiza o restaura por su cuenta
+  /// (botón de la barra de tareas, Win+D, Alt+Tab...).
+  ///
+  /// Sin esto, minimizar desde fuera dejaría los temporizadores trabajando
+  /// contra una ventana que nadie ve, y restaurar desde fuera dejaría la
+  /// captura parada con la ventana delante.
+  void onSystemMinimize() {
+    if (_minimized) return;
+    _minimized = true;
+    notifyListeners();
+  }
+
+  void onSystemRestore() {
+    if (!_minimized && !_background) return;
+    unawaited(restoreOverlay());
   }
 
   void _startKeepAliveTimers() {
@@ -294,7 +362,7 @@ class AppController extends ChangeNotifier {
     // visible" cada pocos segundos mantiene el subtítulo a la vista.
     _topmostTimer?.cancel();
     _topmostTimer = Timer.periodic(const Duration(seconds: 3), (_) {
-      if (_minimized) return;
+      if (isHidden) return;
       _overlay.bringToTop();
       final ({int left, int top, int right, int bottom})? rect = _overlay
           .windowRect();
@@ -327,7 +395,7 @@ class AppController extends ChangeNotifier {
   void _updateSelectivePassthrough() {
     // En segundo plano no hay nada que decidir: la ventana está oculta y tocar
     // sus estilos solo provocaría trabajo (y parpadeos) sin motivo.
-    if (!_ready || _minimized) return;
+    if (!_ready || isHidden) return;
 
     // Sin nada interactivo en pantalla (panel oculto y marcos desactivados) la
     // ventana debe dejar pasar todos los clics.
@@ -491,7 +559,7 @@ class AppController extends ChangeNotifier {
   Future<void> setConfigMode(bool enabled) async {
     // Si la ventana estaba minimizada, el atajo debe recuperarla aunque el modo
     // ya fuese el pedido: es la única vía de vuelta cuando está apartada.
-    if (_minimized) await restoreOverlay();
+    if (isHidden) await restoreOverlay();
     if (_configMode == enabled) return;
     _configMode = enabled;
     await _applyInteractionMode();

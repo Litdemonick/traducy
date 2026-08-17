@@ -154,10 +154,25 @@ class TranslationPipeline {
   Uint8List? _lastSignature;
   String? _lastTranslatedKey;
   String? _pendingKey;
+
+  /// Texto del OCR que está esperando confirmación de estabilidad.
+  ///
+  /// Se guarda entero, no solo su clave, porque un fotograma idéntico confirma
+  /// la estabilidad sin necesidad de repetir el OCR: se traduce este texto.
+  String? _pendingText;
   int _pendingCount = 0;
   int _consecutiveErrors = 0;
   DateTime? _lastTextSeenAt;
-  bool _blackFrameWarned = false;
+
+  /// Cuándo se avisó por última vez de una captura en negro o de una zona plana.
+  ///
+  /// Son fallos persistentes: mientras el juego siga en pantalla completa
+  /// exclusiva, van a repetirse en cada fotograma. Se avisa cada
+  /// [_diagnosisInterval] para que el mensaje siga a la vista sin inundar el
+  /// registro con tres líneas por segundo.
+  DateTime? _blackFrameWarnedAt;
+  DateTime? _flatFrameWarnedAt;
+  static const Duration _diagnosisInterval = Duration(seconds: 12);
 
   bool get isRunning => status.value.state == PipelineState.running;
 
@@ -166,7 +181,8 @@ class TranslationPipeline {
   void start() {
     if (_disposed) return;
     _consecutiveErrors = 0;
-    _blackFrameWarned = false;
+    _blackFrameWarnedAt = null;
+    _flatFrameWarnedAt = null;
     _restartTimer();
     _setStatus(
       state: PipelineState.running,
@@ -186,6 +202,7 @@ class TranslationPipeline {
     _lastSignature = null;
     _lastTranslatedKey = null;
     _pendingKey = null;
+    _pendingText = null;
     _pendingCount = 0;
     _setStatus(state: PipelineState.stopped, message: 'Detenido');
     log.i('pipeline', 'Detenido');
@@ -255,6 +272,7 @@ class TranslationPipeline {
     }
     _lastTranslatedKey = null;
     _pendingKey = null;
+    _pendingText = null;
     _pendingCount = 0;
     _consecutiveErrors = 0;
   }
@@ -326,13 +344,26 @@ class TranslationPipeline {
       );
     }
 
-    // Avisar una sola vez: repetirlo cada fotograma llenaría el registro.
-    if (!_blackFrameWarned) {
-      final StageFailure? black = diagnoseBlackFrame(frame);
-      if (black != null) {
-        _blackFrameWarned = true;
+    // El aviso se repite, pero espaciado. Antes se daba una sola vez, y con una
+    // captura permanentemente en negro el resultado era desconcertante: el
+    // primer aviso pasaba desapercibido y a partir de ahí la aplicación decía
+    // "sin cambios" para siempre, que es cierto y no explica nada.
+    final StageFailure? black = diagnoseBlackFrame(frame);
+    if (black != null) {
+      final DateTime now = DateTime.now();
+      final DateTime? last = _blackFrameWarnedAt;
+      if (last == null || now.difference(last) > _diagnosisInterval) {
+        _blackFrameWarnedAt = now;
         throw black;
       }
+      _setStatus(
+        state: PipelineState.failing,
+        message: 'La zona se captura en negro',
+        hint: 'Pon el juego en modo ventana o sin bordes.',
+        frames: status.value.frames + 1,
+        lastCaptureMs: captureMs,
+      );
+      return;
     }
 
     // ---- 2. Preprocesado en otro isolate
@@ -367,14 +398,78 @@ class TranslationPipeline {
     final int prepMs = watch.elapsedMilliseconds;
 
     // ---- 3. ¿Ha cambiado algo?
+    //
+    // Una zona plana no es que no haya cambiado: es que no se está viendo nada.
+    // Merece su propio mensaje, porque la solución no tiene nada que ver.
+    if (isSignatureFlat(prepared.signature)) {
+      final DateTime now = DateTime.now();
+      final DateTime? last = _flatFrameWarnedAt;
+      if (last == null || now.difference(last) > _diagnosisInterval) {
+        _flatFrameWarnedAt = now;
+        log.w('pipeline', 'La zona de captura no ve nada aprovechable');
+      }
+      _expireSubtitleIfStale();
+      _setStatus(
+        state: PipelineState.running,
+        message: 'La zona no ve texto (imagen plana)',
+        hint:
+            'Comprueba que el rectángulo esté encima del texto del juego y que '
+            'el juego esté en modo ventana o sin bordes.',
+        frames: status.value.frames + 1,
+        skippedUnchanged: status.value.skippedUnchanged + 1,
+        lastCaptureMs: captureMs,
+        lastPrepMs: prepMs,
+        clearStage: true,
+      );
+      return;
+    }
+
     final Uint8List? previous = _lastSignature;
     if (!force && previous != null) {
-      final double distance = signatureDistance(prepared.signature, previous);
-      if (distance < _settings.pipeline.changeThreshold) {
+      final double changed = signatureChangePercent(
+        prepared.signature,
+        previous,
+      );
+      if (changed < _settings.pipeline.minChangePercent) {
+        // Un fotograma idéntico con texto pendiente **confirma** que ese texto
+        // ya está quieto: es exactamente lo que la estabilización estaba
+        // esperando. Sin esto quedaba un bloqueo mutuo que impedía traducir
+        // nada: el primer fotograma dejaba el texto pendiente, y todos los
+        // siguientes lo saltaban por "sin cambios", así que el contador de
+        // estabilidad nunca llegaba a su objetivo. Ahorra además un OCR, porque
+        // sobre la misma imagen daría el mismo resultado.
+        final String? pending = _pendingText;
+        if (pending != null && _pendingKey != null) {
+          _pendingCount++;
+          if (_pendingCount >= _settings.pipeline.stabilityFrames) {
+            await _translateAndShow(
+              text: pending,
+              key: _pendingKey!,
+              captureMs: captureMs,
+              prepMs: prepMs,
+              ocrMs: 0,
+              countOcrRun: false,
+            );
+            return;
+          }
+          _setStatus(
+            state: PipelineState.running,
+            message: 'Esperando texto estable',
+            frames: status.value.frames + 1,
+            lastCaptureMs: captureMs,
+            lastPrepMs: prepMs,
+            clearHint: true,
+            clearStage: true,
+          );
+          return;
+        }
+
         _expireSubtitleIfStale();
         _setStatus(
           state: PipelineState.running,
-          message: 'Sin cambios',
+          // Con el número delante se puede ajustar el umbral con criterio en
+          // lugar de a ciegas.
+          message: 'Sin cambios (${changed.toStringAsFixed(1)} %)',
           frames: status.value.frames + 1,
           skippedUnchanged: status.value.skippedUnchanged + 1,
           lastCaptureMs: captureMs,
@@ -399,6 +494,7 @@ class TranslationPipeline {
     if (text.length < _settings.pipeline.minTextLength) {
       _expireSubtitleIfStale();
       _pendingKey = null;
+      _pendingText = null;
       _pendingCount = 0;
       _setStatus(
         state: PipelineState.running,
@@ -440,8 +536,10 @@ class TranslationPipeline {
     if (!force && _settings.pipeline.stabilityFrames > 1) {
       if (key != _pendingKey) {
         _pendingKey = key;
+        _pendingText = text;
         _pendingCount = 1;
       } else {
+        _pendingText = text;
         _pendingCount++;
       }
       if (_pendingCount < _settings.pipeline.stabilityFrames) {
@@ -459,11 +557,35 @@ class TranslationPipeline {
         return;
       }
     }
+    // ---- 6. Traducción
+    await _translateAndShow(
+      text: text,
+      key: key,
+      captureMs: captureMs,
+      prepMs: prepMs,
+      ocrMs: ocrMs,
+    );
+  }
+
+  /// Traduce, pinta el subtítulo y actualiza el estado.
+  ///
+  /// Es un método aparte porque hay dos caminos que llegan aquí: el normal, tras
+  /// leer texto nuevo, y el de un fotograma repetido que confirma la estabilidad
+  /// del texto ya leído. [countOcrRun] distingue el segundo, donde no se ha
+  /// ejecutado ningún OCR y sumarlo falsearía las estadísticas.
+  Future<void> _translateAndShow({
+    required String text,
+    required String key,
+    required int captureMs,
+    required int prepMs,
+    required int ocrMs,
+    bool countOcrRun = true,
+  }) async {
     _pendingKey = null;
+    _pendingText = null;
     _pendingCount = 0;
 
-    // ---- 6. Traducción
-    watch.reset();
+    final Stopwatch watch = Stopwatch()..start();
     final TranslationResult translation = await _translator.translate(
       text,
       targetLanguage: _settings.engines.targetLanguage,
@@ -473,6 +595,7 @@ class TranslationPipeline {
     final int translateMs = watch.elapsedMilliseconds;
 
     _lastTranslatedKey = key;
+    _lastTextSeenAt = DateTime.now();
     subtitle.value = SubtitleContent(
       translated: translation.text.isEmpty ? text : translation.text,
       original: text,
@@ -483,7 +606,7 @@ class TranslationPipeline {
       state: PipelineState.running,
       message: translation.fromCache ? 'Traducido (caché)' : 'Traducido',
       frames: status.value.frames + 1,
-      ocrRuns: status.value.ocrRuns + 1,
+      ocrRuns: status.value.ocrRuns + (countOcrRun ? 1 : 0),
       translations: status.value.translations + 1,
       cacheHits: status.value.cacheHits + (translation.fromCache ? 1 : 0),
       lastCaptureMs: captureMs,

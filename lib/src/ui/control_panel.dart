@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/app_paths.dart';
+import 'toasts.dart';
 import '../core/logx.dart';
 import '../core/version.dart';
 import '../models/languages.dart';
@@ -8,6 +9,7 @@ import '../models/settings.dart';
 import '../pipeline/pipeline.dart';
 import '../ocr/tessdata_installer.dart';
 import '../state/app_controller.dart';
+import 'about_section.dart';
 import 'update_section.dart';
 import 'widgets_common.dart';
 import 'zone_console.dart';
@@ -31,7 +33,7 @@ class ControlPanel extends StatefulWidget {
 
 class _ControlPanelState extends State<ControlPanel>
     with SingleTickerProviderStateMixin {
-  static const int _tabCount = 5;
+  static const int _tabCount = 6;
 
   late final TabController _tabs = TabController(
     length: _tabCount,
@@ -120,6 +122,7 @@ class _ControlPanelState extends State<ControlPanel>
               Tab(text: 'Estilo'),
               Tab(text: 'Rendimiento'),
               Tab(text: 'Diagnóstico'),
+              Tab(text: 'Acerca de'),
             ],
           ),
           // Expanded en lugar de una altura fija: así el contenido crece y se
@@ -133,6 +136,10 @@ class _ControlPanelState extends State<ControlPanel>
                 _scroll(2, _StyleTab(controller: c)),
                 _scroll(3, _PerformanceTab(controller: c)),
                 _scroll(4, _DiagnosticsTab(controller: c)),
+                _scroll(
+                  5,
+                  AboutSection(controller: c, onCopied: toasts.success),
+                ),
               ],
             ),
           ),
@@ -267,17 +274,19 @@ class _Header extends StatelessWidget {
                   const Expanded(child: SizedBox.shrink()),
                   IconButton(
                     tooltip:
-                        'Enviar a segundo plano. Vuelve con el icono de la bandeja '
-                        'o con Ctrl+Alt+T',
-                    icon: const Icon(Icons.expand_more, size: 18),
+                        'Minimizar. Su botón sigue en la barra de tareas: '
+                        'púlsalo para volver',
+                    icon: const Icon(Icons.remove, size: 18),
                     color: kMuted,
                     onPressed: () => controller.minimizeOverlay(),
                   ),
                   IconButton(
-                    tooltip: 'Ocultar panel y pasar a modo juego (Ctrl+Alt+T)',
+                    tooltip:
+                        'Modo juego: oculta Traducy y lo deja en segundo plano. '
+                        'Vuelve con su icono junto al reloj o con Ctrl+Alt+T',
                     icon: const Icon(Icons.visibility_off, size: 18),
                     color: kMuted,
-                    onPressed: onClose,
+                    onPressed: () => controller.sendToBackground(),
                   ),
                   IconButton(
                     tooltip: 'Salir de Traducy',
@@ -881,8 +890,10 @@ class _RegionTab extends StatelessWidget {
         ),
         const SectionTitle('Transparencia'),
         const HelpText(
-          'Compositor da transparencia real. Si tu equipo muestra un fondo '
-          'opaco, usa el modo compatible por color.',
+          'Compositor da transparencia real y es lo normal. El modo compatible '
+          'recorta un color en vez de usar transparencia real: úsalo solo si con '
+          'Compositor ves un fondo opaco tapando el escritorio. Los bordes '
+          'suaves y los fondos translúcidos del subtítulo pierden calidad.',
         ),
         SegmentedButton<TransparencyMode>(
           segments: const <ButtonSegment<TransparencyMode>>[
@@ -1397,17 +1408,19 @@ class _PerformanceTab extends StatelessWidget {
           style: const TextStyle(color: kMuted, fontSize: 11),
         ),
         SliderRow(
-          label: 'Umbral de cambio',
-          value: p.changeThreshold,
-          min: 0,
-          max: 30,
+          label: 'Cambio mínimo',
+          value: p.minChangePercent,
+          min: 0.1,
+          max: 10,
           decimals: 1,
+          suffix: ' %',
           onChanged: (double v) =>
-              controller.setPipelineSettings(p.copyWith(changeThreshold: v)),
+              controller.setPipelineSettings(p.copyWith(minChangePercent: v)),
         ),
         const HelpText(
-          'Si la imagen cambia menos que este umbral se salta el OCR. Súbelo si '
-          'traduce de más en escenas con animaciones de fondo.',
+          'Cuánto tiene que cambiar la zona para volver a leerla. Bájalo si no '
+          'detecta diálogos nuevos; súbelo si traduce de más en escenas con '
+          'fondos animados.',
         ),
         SliderRow(
           label: 'Estabilidad',
@@ -1605,17 +1618,17 @@ class _DiagnosticsTab extends StatelessWidget {
               Row(
                 children: <Widget>[
                   Icon(
-                    AppPaths.instance.isPortable
-                        ? Icons.usb
-                        : Icons.folder_special,
+                    AppPaths.instance.isBesideProgram
+                        ? Icons.folder_special
+                        : Icons.folder_shared,
                     size: 13,
                     color: kAccent,
                   ),
                   const SizedBox(width: 6),
                   Text(
-                    AppPaths.instance.isPortable
-                        ? 'Modo portátil: todo junto al programa'
-                        : 'Modo instalado: todo en la carpeta del usuario',
+                    AppPaths.instance.isBesideProgram
+                        ? 'Todo junto al programa, donde lo instalaste'
+                        : 'Todo en la carpeta del usuario',
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 11.5,

@@ -13,11 +13,15 @@
 
 #define MyAppName "Traducy"
 ; Version visible, admite sufijo de letras para revisiones pequenas (1.0.0.bs).
-#define MyAppVersion "1.0.0.b"
+#define MyAppVersion "1.0.0.c"
 ; La misma version en cuatro numeros. Windows almacena la version del ejecutable
 ; asi, y un sufijo de letras no es un numero: de ahi que haya dos formas.
-#define MyAppVersionNumeric "1.0.0.2"
-#define MyAppPublisher "Traducy"
+#define MyAppVersionNumeric "1.0.0.3"
+#define MyAppPublisher "Litdemonick"
+#define MyAppAuthor "Litdemonick"
+#define MyAppUrl "https://github.com/Litdemonick/traducy"
+#define MyAppReleasesUrl "https://github.com/Litdemonick/traducy/releases"
+#define MyAppIssuesUrl "https://github.com/Litdemonick/traducy/issues"
 #define MyAppExeName "traducy.exe"
 #define BuildDir "..\build\windows\x64\runner\Release"
 
@@ -34,6 +38,17 @@ VersionInfoVersion={#MyAppVersionNumeric}
 VersionInfoProductVersion={#MyAppVersionNumeric}
 VersionInfoProductTextVersion={#MyAppVersion}
 VersionInfoDescription=Traductor de pantalla en tiempo real
+VersionInfoCompany={#MyAppPublisher}
+VersionInfoCopyright={#MyAppAuthor}
+
+; Enlaces del proyecto. Windows los muestra en "Aplicaciones instaladas" y el
+; asistente los pone en su pagina final: quien recibe el .exe puede comprobar de
+; donde sale y donde reportar un fallo sin tener que preguntar.
+AppPublisherURL={#MyAppUrl}
+AppSupportURL={#MyAppIssuesUrl}
+AppUpdatesURL={#MyAppReleasesUrl}
+AppContact={#MyAppUrl}
+AppReadmeFile={#MyAppUrl}
 
 ; Carpeta propuesta. La pagina de destino queda habilitada a proposito: asi se
 ; puede instalar en otra unidad si el disco C: va justo.
@@ -79,8 +94,10 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [CustomMessages]
 spanish.LaunchAfter=Abrir Traducy al terminar
-spanish.PortableTask=Modo portatil: guardar ajustes e idiomas junto al programa
 spanish.DesktopTask=Crear un acceso directo en el escritorio
+spanish.AboutProject=Traducy lo desarrolla {#MyAppAuthor} y su codigo es publico.%n%nProyecto: {#MyAppUrl}%nVersiones: {#MyAppReleasesUrl}%nFallos y sugerencias: {#MyAppIssuesUrl}
+spanish.AboutHeading=Sobre el proyecto
+spanish.FinishedInfo=Traducy {#MyAppVersion}, de {#MyAppAuthor}.%nCodigo y novedades: {#MyAppUrl}
 spanish.NeedsTesseract=Traducy usa Tesseract OCR para leer el texto de la pantalla.%n%nSi no lo tienes instalado, la propia aplicacion te lo dira al abrirla y te ofrecera instalarlo con un boton. Los idiomas (japones, chino, coreano...) tambien se descargan desde la app.
 spanish.UpdatingFrom=Se ha detectado Traducy %1 instalado.%n%nSe actualizara a la version %2 en la misma carpeta. Tus ajustes y los idiomas descargados se conservan.
 spanish.DowngradeWarning=Ya tienes instalada la version %1, que es mas reciente que la %2 que estas a punto de instalar.%n%nQuieres continuar de todas formas?
@@ -88,8 +105,10 @@ spanish.FreshInstall=Instalacion nueva de Traducy %1.
 spanish.ReplaceInstall=Reemplazando Traducy %1 por la version %2. Se instalara en la misma carpeta y tus ajustes se conservan.
 spanish.SameVersion=Reinstalando Traducy %1 sobre la misma version.
 english.LaunchAfter=Open Traducy when finished
-english.PortableTask=Portable mode: keep settings and languages next to the program
 english.DesktopTask=Create a desktop shortcut
+english.AboutProject=Traducy is developed by {#MyAppAuthor} and its source code is public.%n%nProject: {#MyAppUrl}%nReleases: {#MyAppReleasesUrl}%nBugs and ideas: {#MyAppIssuesUrl}
+english.AboutHeading=About this project
+english.FinishedInfo=Traducy {#MyAppVersion}, by {#MyAppAuthor}.%nSource code and news: {#MyAppUrl}
 english.NeedsTesseract=Traducy uses Tesseract OCR to read text from the screen.%n%nIf it is not installed, the app will tell you when you open it and offer to install it with a button. Languages are downloaded from the app too.
 english.UpdatingFrom=Traducy %1 was found on this computer.%n%nIt will be updated to version %2 in the same folder. Your settings and downloaded languages are kept.
 english.DowngradeWarning=You already have version %1 installed, which is newer than %2.%n%nDo you want to continue anyway?
@@ -99,9 +118,17 @@ english.SameVersion=Reinstalling Traducy %1 over the same version.
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:DesktopTask}"; GroupDescription: "{cm:AdditionalIcons}"
-; El modo portatil deja configuracion e idiomas dentro de la carpeta del
-; programa. Sirve para llevarlo en un USB o para no tocar %APPDATA%.
-Name: "portable"; Description: "{cm:PortableTask}"; Flags: unchecked
+
+[Dirs]
+; Todo lo que genera Traducy vive junto al programa, en la carpeta que elija el
+; usuario: ajustes, idiomas del OCR y descargas de actualizaciones.
+;
+; `users-modify` es imprescindible. Si alguien instala en Archivos de programa,
+; Windows solo da lectura a los usuarios normales, y la aplicacion (que corre sin
+; privilegios) no podria guardar nada. Concediendo escritura a esta subcarpeta
+; durante la instalacion, funciona igual en C:\Program Files, en D:\Juegos o en
+; un USB, sin pedir permisos de administrador cada vez que se abre.
+Name: "{app}\datos"; Permissions: users-modify
 
 [Files]
 ; La carpeta Release completa: el .exe, las DLL de Flutter, los plugins y data\
@@ -118,9 +145,9 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: de
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchAfter}"; Flags: nowait postinstall skipifsilent
 
 [UninstallDelete]
-; Marca del modo portatil y datos guardados junto al programa. Los ajustes de
-; %APPDATA% se dejan intactos a proposito: si alguien reinstala, los recupera.
-Type: files; Name: "{app}\portable.txt"
+; Los datos viven dentro de la carpeta del programa, asi que se van con el.
+; Incluye los ajustes, los idiomas del OCR descargados y los instaladores que
+; haya bajado el actualizador.
 Type: filesandordirs; Name: "{app}\datos"
 
 [Code]
@@ -252,6 +279,11 @@ procedure InitializeWizard();
 begin
   if PreviousVersion <> '' then
     WizardForm.WelcomeLabel2.Caption := FmtMessage(ExpandConstant('{cm:UpdatingFrom}'), [PreviousVersion, '{#MyAppVersion}']);
+
+  { Autor y enlaces en la pagina final. Va aqui y no en un dialogo aparte para
+    no anadir un paso mas al asistente: se lee de pasada al terminar. }
+  WizardForm.FinishedLabel.Caption := WizardForm.FinishedLabel.Caption + #13#10 + #13#10 +
+    ExpandConstant('{cm:FinishedInfo}');
 end;
 
 { Resumen de lo que va a ocurrir, en la pagina de "listo para instalar". Se
@@ -276,6 +308,9 @@ begin
   Result := Summary + NewLine + NewLine + MemoDirInfo;
   if MemoTasksInfo <> '' then
     Result := Result + NewLine + NewLine + MemoTasksInfo;
+  Result := Result + NewLine + NewLine +
+    ExpandConstant('{cm:AboutHeading}') + NewLine + Space +
+    ExpandConstant('{cm:AboutProject}');
 end;
 
 function NextButtonClick(CurPageID: Integer): Boolean;
@@ -287,18 +322,3 @@ begin
   Result := True;
 end;
 
-procedure CurStepChanged(CurStep: TSetupStep);
-var
-  MarkerPath: String;
-begin
-  if CurStep = ssPostInstall then
-  begin
-    { Marca de modo portatil: la aplicacion la busca al arrancar y, si esta,
-      guarda ajustes e idiomas en la carpeta del programa. }
-    MarkerPath := ExpandConstant('{app}\portable.txt');
-    if WizardIsTaskSelected('portable') then
-      SaveStringToFile(MarkerPath, 'Modo portatil: Traducy guarda ajustes e idiomas en la carpeta datos junto a este fichero.' + #13#10, False)
-    else
-      DeleteFile(MarkerPath);
-  end;
-end;

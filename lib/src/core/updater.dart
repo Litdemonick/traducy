@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:http/http.dart' as http;
 
+import 'about.dart';
 import 'app_paths.dart';
 import 'failures.dart';
 import 'logx.dart';
@@ -73,8 +74,8 @@ class Updater {
   Updater({http.Client? client, this.owner = _owner, this.repo = _repo})
     : _client = client ?? http.Client();
 
-  static const String _owner = 'Litdemonick';
-  static const String _repo = 'traducy';
+  static const String _owner = About.githubOwner;
+  static const String _repo = About.githubRepo;
 
   final http.Client _client;
   final String owner;
@@ -83,8 +84,8 @@ class Updater {
   Uri get _latestUri =>
       Uri.https('api.github.com', '/repos/$owner/$repo/releases/latest');
 
-  /// Página de releases, para abrirla en el navegador si algo falla.
-  String get releasesPageUrl => 'https://github.com/$owner/$repo/releases';
+  /// Página de releases, para copiarla si algo falla.
+  String get releasesPageUrl => About.releasesUrl;
 
   /// Consulta la última versión publicada.
   ///
@@ -204,9 +205,7 @@ class Updater {
     void Function(int received, int total)? onProgress,
     Duration timeout = const Duration(minutes: 10),
   }) async {
-    final Directory folder = Directory(
-      '${AppPaths.instance.dataDirectory.path}${Platform.pathSeparator}updates',
-    );
+    final Directory folder = AppPaths.instance.updatesDirectory;
     try {
       await folder.create(recursive: true);
     } catch (e) {

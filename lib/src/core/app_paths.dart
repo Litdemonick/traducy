@@ -4,50 +4,90 @@ import 'logx.dart';
 
 /// Decide dónde guarda Traducy sus cosas.
 ///
-/// Hay un único sitio que resuelve esto para que no haya dos partes de la
-/// aplicación escribiendo en carpetas distintas. Dos modos:
+/// Regla única: **todo vive junto al programa**, en la carpeta que el usuario
+/// eligió al instalar. Si instaló en `D:\Juegos\Traducy`, sus ajustes, los
+/// idiomas del OCR y las descargas de actualizaciones están en
+/// `D:\Juegos\Traducy\datos`. Nada se reparte entre dos sitios.
 ///
-///  - **Instalado** (por defecto): todo en `%APPDATA%\Traducy`. Es lo correcto
-///    en Windows porque la carpeta del programa suele estar bajo
-///    `C:\Program Files`, donde un programa sin privilegios no puede escribir.
+/// El instalador concede permiso de escritura a esa subcarpeta (`users-modify`),
+/// así que funciona igual en `C:\Program Files` que en un USB, sin pedir
+/// permisos de administrador al abrir la aplicación.
 ///
-///  - **Portátil**: si junto al ejecutable hay un fichero `portable.txt`, todo
-///    va a `datos\` dentro de la propia carpeta del programa. Lo crea el
-///    instalador cuando se marca esa opción, y sirve para llevar Traducy en un
-///    USB o para tenerlo todo en la unidad que el usuario elija.
+/// Queda un respaldo a `%APPDATA%` para el caso en que la carpeta no admita
+/// escritura de verdad: compilar y ejecutar desde una ruta protegida sin pasar
+/// por el instalador, o una unidad de solo lectura. Sin ese respaldo, los
+/// ajustes no se guardarían y nada lo explicaría.
 class AppPaths {
-  AppPaths._({required this.dataDirectory, required this.isPortable});
+  AppPaths._({
+    required this.dataDirectory,
+    required this.isBesideProgram,
+    this.fallbackReason,
+  });
 
   /// Carpeta raíz de todos los datos de la aplicación.
   final Directory dataDirectory;
 
-  /// `true` si se está usando la carpeta del programa en lugar de `%APPDATA%`.
-  final bool isPortable;
+  /// `true` si los datos están junto al programa, como debe ser.
+  final bool isBesideProgram;
+
+  /// Explicación de por qué se tuvo que recurrir a `%APPDATA%`, o `null` si no
+  /// hizo falta. La interfaz lo muestra para que no haya misterio sobre dónde
+  /// acabaron los ficheros.
+  final String? fallbackReason;
 
   static AppPaths? _instance;
 
-  /// Marca que activa el modo portátil, creada por el instalador.
-  static const String portableMarker = 'portable.txt';
+  /// Nombre de la subcarpeta de datos. Coincide con la que crea el instalador.
+  static const String dataFolderName = 'datos';
 
   static AppPaths get instance => _instance ??= _resolve();
 
+  /// Comprueba escribiendo de verdad, no consultando permisos.
+  ///
+  /// Los permisos de Windows tienen suficientes capas (ACL, herencia,
+  /// virtualización de carpetas protegidas) para que consultarlos dé respuestas
+  /// engañosas. Crear y borrar un fichero es la única prueba que no miente.
+  static bool _canWriteInto(Directory directory) {
+    File? probe;
+    try {
+      directory.createSync(recursive: true);
+      probe = File(
+        '${directory.path}${Platform.pathSeparator}'
+        '.escritura-${DateTime.now().microsecondsSinceEpoch}',
+      );
+      probe.writeAsStringSync('ok', flush: true);
+      return true;
+    } catch (_) {
+      return false;
+    } finally {
+      try {
+        if (probe != null && probe.existsSync()) probe.deleteSync();
+      } catch (_) {
+        // Si no se puede borrar la prueba, tampoco se podía escribir: da igual.
+      }
+    }
+  }
+
   static AppPaths _resolve() {
+    String? reason;
+
     try {
       final Directory exeDir = File(Platform.resolvedExecutable).parent;
-      final File marker = File(
-        '${exeDir.path}${Platform.pathSeparator}$portableMarker',
+      final Directory beside = Directory(
+        '${exeDir.path}${Platform.pathSeparator}$dataFolderName',
       );
-      if (marker.existsSync()) {
-        final Directory data = Directory(
-          '${exeDir.path}${Platform.pathSeparator}datos',
-        );
-        log.i('paths', 'Modo portátil: datos en ${data.path}');
-        return AppPaths._(dataDirectory: data, isPortable: true);
+      if (_canWriteInto(beside)) {
+        log.i('paths', 'Datos junto al programa: ${beside.path}');
+        return AppPaths._(dataDirectory: beside, isBesideProgram: true);
       }
+      reason =
+          'La carpeta ${beside.path} no admite escritura, así que los datos '
+          'van a la carpeta del usuario. Reinstala en una ubicación con '
+          'permisos si quieres tenerlo todo junto al programa.';
+      log.w('paths', reason);
     } catch (e) {
-      // Sin acceso al directorio del ejecutable se sigue con %APPDATA%, que es
-      // el comportamiento normal.
-      log.w('paths', 'No se pudo comprobar el modo portátil: $e');
+      reason = 'No se pudo usar la carpeta del programa: $e';
+      log.w('paths', reason);
     }
 
     final String? appData = Platform.environment['APPDATA'];
@@ -55,8 +95,11 @@ class AppPaths {
         ? appData
         // Último recurso para sesiones muy restringidas sin APPDATA definido.
         : Directory.systemTemp.path;
-    final Directory data = Directory('$base${Platform.pathSeparator}Traducy');
-    return AppPaths._(dataDirectory: data, isPortable: false);
+    return AppPaths._(
+      dataDirectory: Directory('$base${Platform.pathSeparator}Traducy'),
+      isBesideProgram: false,
+      fallbackReason: reason,
+    );
   }
 
   /// Fichero de ajustes.
@@ -67,8 +110,12 @@ class AppPaths {
   Directory get tessdataDirectory =>
       Directory('${dataDirectory.path}${Platform.pathSeparator}tessdata');
 
+  /// Carpeta donde el actualizador guarda los instaladores que descarga.
+  Directory get updatesDirectory =>
+      Directory('${dataDirectory.path}${Platform.pathSeparator}updates');
+
   /// Solo para pruebas: permite forzar una raíz distinta.
   static void overrideForTesting(Directory directory) {
-    _instance = AppPaths._(dataDirectory: directory, isPortable: false);
+    _instance = AppPaths._(dataDirectory: directory, isBesideProgram: true);
   }
 }

@@ -339,7 +339,7 @@ class PreprocessSettings {
 class PipelineSettings {
   const PipelineSettings({
     this.intervalMs = 350,
-    this.changeThreshold = 6.0,
+    this.minChangePercent = 0.8,
     this.stabilityFrames = 2,
     this.minTextLength = 2,
     this.holdMs = 2500,
@@ -352,10 +352,20 @@ class PipelineSettings {
   /// castigar los FPS del juego.
   final int intervalMs;
 
-  /// Diferencia media de píxeles (0-255) por debajo de la cual se considera que
-  /// la imagen no ha cambiado y se salta el OCR. Es el ahorro grande de CPU y
-  /// de llamadas a la API de traducción.
-  final double changeThreshold;
+  /// Porcentaje de la zona que debe cambiar para repetir el OCR. Es el ahorro
+  /// grande de CPU y de llamadas a la API de traducción.
+  ///
+  /// Sustituye al antiguo "umbral de cambio", que comparaba la diferencia media
+  /// de píxeles: esa media diluía los cambios pequeños y localizados, y un
+  /// renglón de diálogo nuevo dentro de una franja ancha se quedaba por debajo
+  /// de cualquier umbral útil. El síntoma era el peor posible: la aplicación
+  /// repetía "sin cambios" sin traducir nunca.
+  ///
+  /// 0.8 % de una rejilla de 32x32 son 8 celdas: por debajo de lo que ocupa un
+  /// renglón corto de diálogo dentro de una franja ancha, y muy por encima del
+  /// ruido de un fondo animado, que mueve muchas celdas pero pocos niveles y no
+  /// llega a contar.
+  final double minChangePercent;
 
   /// Fotogramas consecutivos con el mismo texto antes de traducir. Evita
   /// traducir diálogos a medio escribir en juegos con efecto máquina de escribir.
@@ -375,7 +385,7 @@ class PipelineSettings {
 
   PipelineSettings copyWith({
     int? intervalMs,
-    double? changeThreshold,
+    double? minChangePercent,
     int? stabilityFrames,
     int? minTextLength,
     int? holdMs,
@@ -384,7 +394,7 @@ class PipelineSettings {
     int? maxConsecutiveErrors,
   }) => PipelineSettings(
     intervalMs: intervalMs ?? this.intervalMs,
-    changeThreshold: changeThreshold ?? this.changeThreshold,
+    minChangePercent: minChangePercent ?? this.minChangePercent,
     stabilityFrames: stabilityFrames ?? this.stabilityFrames,
     minTextLength: minTextLength ?? this.minTextLength,
     holdMs: holdMs ?? this.holdMs,
@@ -395,7 +405,7 @@ class PipelineSettings {
 
   Map<String, dynamic> toJson() => <String, dynamic>{
     'intervalMs': intervalMs,
-    'changeThreshold': changeThreshold,
+    'minChangePercent': minChangePercent,
     'stabilityFrames': stabilityFrames,
     'minTextLength': minTextLength,
     'holdMs': holdMs,
@@ -404,23 +414,24 @@ class PipelineSettings {
     'maxConsecutiveErrors': maxConsecutiveErrors,
   };
 
-  static PipelineSettings fromJson(Map<String, dynamic> json) =>
-      PipelineSettings(
-        intervalMs: _asInt(json['intervalMs'], 350).clamp(120, 5000),
-        changeThreshold: _asDouble(json['changeThreshold'], 6.0).clamp(0, 60),
-        stabilityFrames: _asInt(json['stabilityFrames'], 2).clamp(1, 6),
-        minTextLength: _asInt(json['minTextLength'], 2).clamp(1, 40),
-        holdMs: _asInt(json['holdMs'], 2500).clamp(0, 30000),
-        ocrTimeoutMs: _asInt(json['ocrTimeoutMs'], 4000).clamp(500, 30000),
-        translateTimeoutMs: _asInt(
-          json['translateTimeoutMs'],
-          6000,
-        ).clamp(500, 60000),
-        maxConsecutiveErrors: _asInt(
-          json['maxConsecutiveErrors'],
-          8,
-        ).clamp(2, 100),
-      );
+  static PipelineSettings fromJson(
+    Map<String, dynamic> json,
+  ) => PipelineSettings(
+    intervalMs: _asInt(json['intervalMs'], 350).clamp(120, 5000),
+    // Se lee solo la clave nueva a propósito. Un `changeThreshold` guardado
+    // valía 6 en una escala de 0-255 y significaría 6 % aquí: cinco veces
+    // más exigente de lo debido, justo el fallo que se está corrigiendo.
+    minChangePercent: _asDouble(json['minChangePercent'], 1.2).clamp(0.1, 25),
+    stabilityFrames: _asInt(json['stabilityFrames'], 2).clamp(1, 6),
+    minTextLength: _asInt(json['minTextLength'], 2).clamp(1, 40),
+    holdMs: _asInt(json['holdMs'], 2500).clamp(0, 30000),
+    ocrTimeoutMs: _asInt(json['ocrTimeoutMs'], 4000).clamp(500, 30000),
+    translateTimeoutMs: _asInt(
+      json['translateTimeoutMs'],
+      6000,
+    ).clamp(500, 60000),
+    maxConsecutiveErrors: _asInt(json['maxConsecutiveErrors'], 8).clamp(2, 100),
+  );
 }
 
 class EngineSettings {

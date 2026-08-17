@@ -155,11 +155,12 @@ class _TraducyAppState extends State<TraducyApp>
 
   // ------------------------------------------------------------- bandeja
 
-  /// Clic izquierdo: recuperar la ventana. Es el gesto que espera cualquiera
-  /// con un icono en la bandeja.
+  /// Clic izquierdo: recuperar la ventana **y** abrir el panel de control. Es
+  /// el gesto que espera cualquiera con un icono en la bandeja; restaurar solo
+  /// un overlay transparente dejaría la sensación de que no ha pasado nada.
   @override
   void onTrayIconMouseDown() {
-    unawaited(_controller.restoreOverlay());
+    unawaited(_controller.restoreOverlay(openPanel: true));
   }
 
   @override
@@ -171,7 +172,7 @@ class _TraducyAppState extends State<TraducyApp>
   void onTrayMenuItemClick(MenuItem menuItem) {
     switch (menuItem.key) {
       case TrayAction.show:
-        unawaited(_controller.restoreOverlay());
+        unawaited(_controller.restoreOverlay(openPanel: true));
       case TrayAction.togglePause:
         _controller.togglePause();
       case TrayAction.toggleSubtitles:
@@ -184,6 +185,19 @@ class _TraducyAppState extends State<TraducyApp>
   @override
   void onWindowClose() {
     unawaited(_exit());
+  }
+
+  /// Minimizar y restaurar también ocurren desde fuera: el botón de la barra de
+  /// tareas, Win+D o Alt+Tab. Se avisa al controlador para que pare o reanude la
+  /// captura y reafirme la geometría al volver.
+  @override
+  void onWindowMinimize() {
+    _controller.onSystemMinimize();
+  }
+
+  @override
+  void onWindowRestore() {
+    _controller.onSystemRestore();
   }
 
   /// Cierre en orden y a prueba de bloqueos.
