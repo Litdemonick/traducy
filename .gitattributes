@@ -1,0 +1,24 @@
+# Normaliza los finales de linea en el repositorio.
+#
+# Sin esto, Windows guarda CRLF y cada clon desde otro sistema genera un diff
+# completo en ficheros que nadie ha tocado. Se almacena LF y cada equipo usa lo
+# que le corresponda al sacar los ficheros.
+* text=auto eol=lf
+
+# Ficheros de Windows que deben conservar CRLF para que sus herramientas los
+# lean bien.
+*.iss   text eol=crlf
+*.rc    text eol=crlf
+*.bat   text eol=crlf
+*.ps1   text eol=crlf
+*.sln   text eol=crlf
+*.vcxproj text eol=crlf
+
+# Binarios: nunca convertir.
+*.png   binary
+*.jpg   binary
+*.ico   binary
+*.bmp   binary
+*.otf   binary
+*.ttf   binary
+*.traineddata binary

@@ -1,0 +1,85 @@
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.build/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+migrate_working_dir/
+
+# IntelliJ related
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# The .vscode folder contains launch configuration and tasks you configure in
+# VS Code which you may wish to be included in version control, so this line
+# is commented out by default.
+#.vscode/
+
+# Flutter/Dart/Pub related
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_tool/
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+/build/
+/coverage/
+
+# Symbolication related
+app.*.symbols
+
+# Obfuscation related
+app.*.map.json
+
+# Android Studio will place build artifacts here
+/android/app/debug
+/android/app/profile
+/android/app/release
+
+# Widget Preview related
+.widget_preview/
+
+# ---------------------------------------------------------------- Traducy
+# Instaladores compilados. Van como archivos adjuntos de la release en GitHub,
+# nunca dentro del repositorio: son binarios de 12 MB que cambiarian en cada
+# version e inflarian el historial para siempre.
+/installer/salida/
+*.exe
+
+# Runtime de Flutter que copia el propio SDK al compilar. Se regenera solo.
+/windows/flutter/ephemeral/
+
+# Ajustes locales. La aplicacion guarda las API keys en texto plano en
+# %APPDATA%\Traducy\settings.json; este patron es una red de seguridad por si
+# alguna vez se copia un settings.json al proyecto para depurar.
+settings.json
+*.settings.json
+
+# Datos de idioma del OCR: los descarga la aplicacion sola y pesan megas.
+*.traineddata
+
+# Copias de seguridad y ficheros a medias
+*.corrupt-*
+*.part
+*.bak
+*.backup-*
+*.orig
+*.rej
+
+# Credenciales, por si acaso. Nada del proyecto las usa, pero un despiste con
+# un fichero de estos en el repositorio no tiene vuelta atras.
+*.pem
+*.key
+*.p12
+*.pfx
+.env
+.env.*
+secrets.json
